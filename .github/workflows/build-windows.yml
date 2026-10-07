@@ -1,0 +1,107 @@
+name: Build PTT Connect Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "windows/**"
+      - ".github/workflows/build-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    env:
+      WEBSPEAK3_COMMIT: c2b52b323d2ef10e388b2b600444a98390c5cc7a
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+    steps:
+      - name: Checkout PTT Connect
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Clone TeamSpeak client base
+        shell: bash
+        run: |
+          git clone --recurse-submodules https://github.com/Moepchi/webspeak3.git upstream
+          cd upstream
+          git checkout "$WEBSPEAK3_COMMIT"
+          git submodule update --init --recursive
+
+      - name: Apply PTT Connect branding
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem "upstream/web" -Recurse -File |
+            Where-Object { $_.Extension -in ".ts", ".tsx", ".json", ".html" }
+
+          foreach ($file in $files) {
+            $text = Get-Content $file.FullName -Raw
+
+            if ($text.Contains("WebSpeak3")) {
+              $text = $text.Replace("WebSpeak3", "PTT Connect")
+              Set-Content -Path $file.FullName -Value $text -Encoding UTF8
+            }
+          }
+
+      - name: Build TeamSpeak connector
+        shell: bash
+        run: |
+          cd upstream/connector
+          cargo build --release
+
+      - name: Build gateway
+        shell: bash
+        run: |
+          cd upstream/gateway
+          npm ci
+          npm run build
+          npm prune --omit=dev
+
+      - name: Build PTT Connect interface
+        shell: bash
+        env:
+          VITE_DEFAULT_SERVER: Heerlen.MIJNTS3.NL
+          VITE_DONATE_URL: ""
+        run: |
+          cd upstream/web
+          npm ci
+          npm run build
+
+      - name: Stage Windows runtime
+        shell: bash
+        run: |
+          rm -rf windows/runtime
+          mkdir -p windows/runtime/web
+          mkdir -p windows/runtime/gateway
+          mkdir -p windows/runtime/connector
+
+          cp -R upstream/web/dist/. windows/runtime/web/
+          cp -R upstream/gateway/dist windows/runtime/gateway/dist
+          cp -R upstream/gateway/node_modules windows/runtime/gateway/node_modules
+          cp upstream/connector/target/release/ts-connector.exe windows/runtime/connector/ts-connector.exe
+          cp upstream/LICENSE windows/runtime/LICENSE-WebSpeak3.txt
+
+      - name: Package Windows app
+        shell: bash
+        run: |
+          cd windows
+          npm install
+          npm run dist
+
+      - name: Upload Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: PTTConnect-Windows
+          path: windows/dist/*.exe
+          if-no-files-found: error
