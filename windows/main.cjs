@@ -1,31 +1,13 @@
 const { app, BrowserWindow, session, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
+
+const PTT_PORT = 32137;
+const PTT_PARTITION = "persist:pttconnect";
 
 let gatewayProcess;
 let mainWindow;
-
-function getFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-
-    server.unref();
-    server.on("error", reject);
-
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-
-      const port =
-        typeof address === "object" && address
-          ? address.port
-          : 0;
-
-      server.close(() => resolve(port));
-    });
-  });
-}
 
 function waitForGateway(port, attempts = 80) {
   return new Promise((resolve, reject) => {
@@ -45,9 +27,7 @@ function waitForGateway(port, attempts = 80) {
           } else if (left > 0) {
             setTimeout(() => tryOnce(left - 1), 250);
           } else {
-            reject(
-              new Error("PTT Connect gateway startte niet.")
-            );
+            reject(new Error("PTT Connect gateway startte niet."));
           }
         }
       );
@@ -61,9 +41,7 @@ function waitForGateway(port, attempts = 80) {
           setTimeout(() => tryOnce(left - 1), 250);
         } else {
           reject(
-            new Error(
-              "PTT Connect gateway is niet bereikbaar."
-            )
+            new Error("PTT Connect gateway is niet bereikbaar.")
           );
         }
       });
@@ -120,11 +98,8 @@ function startGateway(port) {
     [gatewayEntry],
     {
       cwd: path.dirname(gatewayEntry),
-
       env,
-
       windowsHide: true,
-
       stdio: [
         "ignore",
         "pipe",
@@ -166,56 +141,57 @@ function stopGateway() {
 }
 
 async function createWindow() {
-  const port = await getFreePort();
-
-  startGateway(port);
-
-  await waitForGateway(port);
-
   const localOrigin =
-    `http://127.0.0.1:${port}`;
+    `http://127.0.0.1:${PTT_PORT}`;
 
-  session.defaultSession
-    .setPermissionRequestHandler(
-      (
-        webContents,
-        permission,
-        callback
-      ) => {
-        const url =
-          webContents.getURL();
+  startGateway(PTT_PORT);
 
-        const allowedOrigin =
-          url.startsWith(localOrigin);
+  await waitForGateway(PTT_PORT);
 
-        callback(
-          allowedOrigin &&
-          (
-            permission === "media" ||
-            permission === "notifications"
-          )
-        );
-      }
+  const pttSession =
+    session.fromPartition(
+      PTT_PARTITION
     );
 
-  session.defaultSession
-    .setPermissionCheckHandler(
-      (
-        webContents,
-        permission,
-        requestingOrigin
-      ) => {
-        return (
-          requestingOrigin.startsWith(
-            localOrigin
-          ) &&
-          (
-            permission === "media" ||
-            permission === "notifications"
-          )
-        );
-      }
-    );
+  pttSession.setPermissionRequestHandler(
+    (
+      webContents,
+      permission,
+      callback
+    ) => {
+      const url =
+        webContents.getURL();
+
+      const allowedOrigin =
+        url.startsWith(localOrigin);
+
+      callback(
+        allowedOrigin &&
+        (
+          permission === "media" ||
+          permission === "notifications"
+        )
+      );
+    }
+  );
+
+  pttSession.setPermissionCheckHandler(
+    (
+      webContents,
+      permission,
+      requestingOrigin
+    ) => {
+      return (
+        requestingOrigin.startsWith(
+          localOrigin
+        ) &&
+        (
+          permission === "media" ||
+          permission === "notifications"
+        )
+      );
+    }
+  );
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -237,7 +213,9 @@ async function createWindow() {
 
       nodeIntegration: false,
 
-      sandbox: true
+      sandbox: true,
+
+      partition: PTT_PARTITION
     }
   });
 
@@ -264,34 +242,54 @@ async function createWindow() {
   );
 }
 
-app.on(
-  "before-quit",
-  () => {
-    app.isQuitting = true;
+const gotLock =
+  app.requestSingleInstanceLock();
 
-    stopGateway();
-  }
-);
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on(
+    "second-instance",
+    () => {
+      if (mainWindow) {
+        if (
+          mainWindow.isMinimized()
+        ) {
+          mainWindow.restore();
+        }
 
-app.on(
-  "window-all-closed",
-  () => {
-    stopGateway();
-
-    if (
-      process.platform !== "darwin"
-    ) {
-      app.quit();
+        mainWindow.focus();
+      }
     }
-  }
-);
+  );
 
-app.whenReady()
-  .then(createWindow)
-  .catch((error) => {
-    console.error(error);
+  app.on(
+    "before-quit",
+    () => {
+      stopGateway();
+    }
+  );
 
-    stopGateway();
+  app.on(
+    "window-all-closed",
+    () => {
+      stopGateway();
 
-    app.quit();
-  });
+      if (
+        process.platform !== "darwin"
+      ) {
+        app.quit();
+      }
+    }
+  );
+
+  app.whenReady()
+    .then(createWindow)
+    .catch((error) => {
+      console.error(error);
+
+      stopGateway();
+
+      app.quit();
+    });
+}
