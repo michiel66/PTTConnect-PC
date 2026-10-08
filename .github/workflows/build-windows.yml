@@ -71,7 +71,6 @@ jobs:
       - name: Build PTT Connect interface
         shell: bash
         env:
-          VITE_DEFAULT_SERVER: Heerlen.MIJNTS3.NL
           VITE_DONATE_URL: ""
         run: |
           cd upstream/web
