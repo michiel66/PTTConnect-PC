@@ -84,8 +84,6 @@ function startGateway(port) {
 
     CONNECTOR_BIN: connectorBin,
 
-    DEFAULT_SERVER: "Heerlen.MIJNTS3.NL",
-
     FEEDBACK_ENABLED: "0",
 
     STORE_ENABLED: "0",
