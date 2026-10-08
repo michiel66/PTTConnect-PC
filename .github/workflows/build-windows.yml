@@ -28,6 +28,11 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -38,6 +43,11 @@ jobs:
           cd upstream
           git checkout "$WEBSPEAK3_COMMIT"
           git submodule update --init --recursive
+
+      - name: Apply PTT Connect desktop functions
+        shell: bash
+        run: |
+          python windows/patch_webspeak3.py
 
       - name: Apply PTT Connect branding
         shell: pwsh
