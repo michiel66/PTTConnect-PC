@@ -22,12 +22,22 @@ function waitForGateway(port, attempts = 80) {
         (res) => {
           res.resume();
 
-          if (res.statusCode && res.statusCode < 500) {
+          if (
+            res.statusCode &&
+            res.statusCode < 500
+          ) {
             resolve();
           } else if (left > 0) {
-            setTimeout(() => tryOnce(left - 1), 250);
+            setTimeout(
+              () => tryOnce(left - 1),
+              250
+            );
           } else {
-            reject(new Error("PTT Connect gateway startte niet."));
+            reject(
+              new Error(
+                "PTT Connect gateway startte niet."
+              )
+            );
           }
         }
       );
@@ -38,10 +48,15 @@ function waitForGateway(port, attempts = 80) {
 
       req.on("error", () => {
         if (left > 0) {
-          setTimeout(() => tryOnce(left - 1), 250);
+          setTimeout(
+            () => tryOnce(left - 1),
+            250
+          );
         } else {
           reject(
-            new Error("PTT Connect gateway is niet bereikbaar.")
+            new Error(
+              "PTT Connect gateway is niet bereikbaar."
+            )
           );
         }
       });
@@ -71,7 +86,9 @@ function startGateway(port) {
     "ts-connector.exe"
   );
 
-  const webDist = runtimePath("web");
+  const webDist = runtimePath(
+    "web"
+  );
 
   const env = {
     ...process.env,
@@ -95,9 +112,14 @@ function startGateway(port) {
     process.execPath,
     [gatewayEntry],
     {
-      cwd: path.dirname(gatewayEntry),
+      cwd: path.dirname(
+        gatewayEntry
+      ),
+
       env,
+
       windowsHide: true,
+
       stdio: [
         "ignore",
         "pipe",
@@ -142,9 +164,13 @@ async function createWindow() {
   const localOrigin =
     `http://127.0.0.1:${PTT_PORT}`;
 
-  startGateway(PTT_PORT);
+  startGateway(
+    PTT_PORT
+  );
 
-  await waitForGateway(PTT_PORT);
+  await waitForGateway(
+    PTT_PORT
+  );
 
   const pttSession =
     session.fromPartition(
@@ -161,7 +187,9 @@ async function createWindow() {
         webContents.getURL();
 
       const allowedOrigin =
-        url.startsWith(localOrigin);
+        url.startsWith(
+          localOrigin
+        );
 
       callback(
         allowedOrigin &&
@@ -191,31 +219,45 @@ async function createWindow() {
     }
   );
 
-  mainWindow = new BrowserWindow({
-    width: 1440,
+  mainWindow =
+    new BrowserWindow({
+      width: 1600,
 
-    height: 900,
+      height: 1000,
 
-    minWidth: 980,
+      minWidth: 1100,
 
-    minHeight: 650,
+      minHeight: 700,
 
-    title: "PTT Connect",
+      title:
+        "PTT Connect",
 
-    backgroundColor: "#07111f",
+      backgroundColor:
+        "#07111f",
 
-    autoHideMenuBar: true,
+      autoHideMenuBar:
+        true,
 
-    webPreferences: {
-      contextIsolation: true,
+      show:
+        false,
 
-      nodeIntegration: false,
+      center:
+        true,
 
-      sandbox: true,
+      webPreferences: {
+        contextIsolation:
+          true,
 
-      partition: PTT_PARTITION
-    }
-  });
+        nodeIntegration:
+          false,
+
+        sandbox:
+          true,
+
+        partition:
+          PTT_PARTITION
+      }
+    });
 
   mainWindow.removeMenu();
 
@@ -223,10 +265,16 @@ async function createWindow() {
     .setWindowOpenHandler(
       ({ url }) => {
         if (
-          url.startsWith("http://") ||
-          url.startsWith("https://")
+          url.startsWith(
+            "http://"
+          ) ||
+          url.startsWith(
+            "https://"
+          )
         ) {
-          shell.openExternal(url);
+          shell.openExternal(
+            url
+          );
         }
 
         return {
@@ -234,6 +282,17 @@ async function createWindow() {
         };
       }
     );
+
+  mainWindow.once(
+    "ready-to-show",
+    () => {
+      mainWindow.maximize();
+
+      mainWindow.show();
+
+      mainWindow.focus();
+    }
+  );
 
   await mainWindow.loadURL(
     localOrigin
@@ -256,6 +315,12 @@ if (!gotLock) {
           mainWindow.restore();
         }
 
+        if (
+          !mainWindow.isVisible()
+        ) {
+          mainWindow.show();
+        }
+
         mainWindow.focus();
       }
     }
@@ -274,7 +339,8 @@ if (!gotLock) {
       stopGateway();
 
       if (
-        process.platform !== "darwin"
+        process.platform !==
+        "darwin"
       ) {
         app.quit();
       }
@@ -282,12 +348,18 @@ if (!gotLock) {
   );
 
   app.whenReady()
-    .then(createWindow)
-    .catch((error) => {
-      console.error(error);
+    .then(
+      createWindow
+    )
+    .catch(
+      (error) => {
+        console.error(
+          error
+        );
 
-      stopGateway();
+        stopGateway();
 
-      app.quit();
-    });
+        app.quit();
+      }
+    );
 }
