@@ -150,20 +150,6 @@ voice = replace_once(
 
 # ============================================================
 # DIRECTE TEAMSpeak ONTVANGSTAUDIO
-#
-# Oude route:
-# TeamSpeak
-# -> AudioContext
-# -> MediaStream
-# -> verborgen HTML audio element
-# -> Windows
-#
-# Nieuwe route:
-# TeamSpeak
-# -> AudioContext
-# -> Windows speakers
-#
-# Hierdoor verwijderen we een extra playback-buffer/resampler.
 # ============================================================
 
 voice = replace_once(
@@ -224,9 +210,6 @@ voice = replace_once(
     this.gain =
       context.createGain();
 
-    // Rechtstreeks naar Windows / de gekozen
-    // AudioContext output. Geen verborgen
-    // HTML audio element meer ertussen.
     this.gain.connect(
       context.destination
     );
@@ -240,13 +223,11 @@ voice = replace_once(
       try {
         source.stop();
       } catch {
-        // Kan al afgelopen zijn.
       }
 
       try {
         source.disconnect();
       } catch {
-        // Kan al losgekoppeld zijn.
       }
     }
 
@@ -277,14 +258,9 @@ voice = replace_once(
     '''    const now =
       this.context.currentTime;
 
-    // Kleine buffer voor vloeiende spraak.
-    // We willen dicht bij live blijven.
     const minimumLead =
       0.02;
 
-    // Maximaal ongeveer 120 ms vooruit.
-    // Als dit groter wordt is er een
-    // achterstand ontstaan.
     const maximumLead =
       0.12;
 
@@ -296,12 +272,6 @@ voice = replace_once(
         now + minimumLead;
     }
 
-    // Belangrijk:
-    // laat geen oude spraak langzaam
-    // afspelen en daarna versneld inhalen.
-    //
-    // Bij te grote achterstand springen
-    // we terug naar live.
     if (
       this.nextTime >
       now + maximumLead
@@ -318,7 +288,6 @@ voice = replace_once(
     source.buffer =
       buffer;
 
-    // Altijd normale afspeelsnelheid.
     source.playbackRate.value =
       1.0;
 
@@ -338,7 +307,6 @@ voice = replace_once(
       try {
         source.disconnect();
       } catch {
-        // Al losgekoppeld.
       }
     };
 
@@ -368,11 +336,6 @@ voice = replace_once(
     "AudioPlayer direct reset"
 )
 
-
-# ============================================================
-# OUTPUT DEVICE
-# AudioContext zelf kiest nu het Windows audio-apparaat.
-# ============================================================
 
 voice = replace_once(
     voice,
@@ -412,11 +375,6 @@ voice = replace_once(
         deviceId
       );
     }
-
-    // Moderne Electron/Chromium gebruikt
-    // AudioContext.setSinkId rechtstreeks.
-    // Als dat niet beschikbaar is blijft
-    // Windows' standaardapparaat actief.
   }
 
   dispose(): void {
@@ -429,7 +387,6 @@ voice = replace_once(
     try {
       this.gain.disconnect();
     } catch {
-      // Kan al losgekoppeld zijn.
     }
   }
 ''',
@@ -498,7 +455,25 @@ number_loader = '''function loadNumberPref(key: string, fallback: number): numbe
 }
 '''
 
-number_loader_new = '''function loadNumberPref(key: string, fallback: number): number {
+number_loader_new = '''const PTT_AUDIO_STREAMS = [
+  {
+    id: "pi2nos",
+    name: "PI2NOS",
+    url: "https://stream.hobbyscoop.nl/pi2nos",
+  },
+  {
+    id: "pi3utr",
+    name: "PI3UTR",
+    url: "https://stream.hobbyscoop.nl/pi3utr",
+  },
+  {
+    id: "pi3goe",
+    name: "PI3GOE",
+    url: "https://stream.hobbyscoop.nl/pi3goe",
+  },
+] as const;
+
+function loadNumberPref(key: string, fallback: number): number {
   const raw = localStorage.getItem(key);
   const parsed = raw === null ? NaN : Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -547,45 +522,34 @@ function formatPttHotkey(
 
   const labels: Record<string, string> = {
     Space: "Spatiebalk",
-
     ControlLeft: "Linker Ctrl",
     ControlRight: "Rechter Ctrl",
-
     ShiftLeft: "Linker Shift",
     ShiftRight: "Rechter Shift",
-
     AltLeft: "Linker Alt",
     AltRight: "Rechter Alt",
-
     MetaLeft: "Linker Windows-toets",
     MetaRight: "Rechter Windows-toets",
-
     Enter: "Enter",
     NumpadEnter: "Numpad Enter",
-
     Tab: "Tab",
     CapsLock: "Caps Lock",
     Backspace: "Backspace",
     Delete: "Delete",
     Insert: "Insert",
-
     Home: "Home",
     End: "End",
-
     PageUp: "Page Up",
     PageDown: "Page Down",
-
     ArrowUp: "Pijl omhoog",
     ArrowDown: "Pijl omlaag",
     ArrowLeft: "Pijl links",
     ArrowRight: "Pijl rechts",
-
     NumpadAdd: "Numpad +",
     NumpadSubtract: "Numpad -",
     NumpadMultiply: "Numpad *",
     NumpadDivide: "Numpad /",
     NumpadDecimal: "Numpad .",
-
     Pause: "Pause",
     ScrollLock: "Scroll Lock",
     NumLock: "Num Lock",
@@ -668,7 +632,7 @@ app = replace_once(
     app,
     number_loader,
     number_loader_new,
-    "PTT preference loaders"
+    "PTT preference loaders and audio streams"
 )
 
 
@@ -862,6 +826,185 @@ app = replace_once(
 
 
 # ============================================================
+# AUDIO PLAYER DIALOG
+# ============================================================
+
+audio_dialog = r'''
+function PttAudioPlayersDialog({
+  activeStreamId,
+  errorMessage,
+  onPlay,
+  onStop,
+  onClose,
+}: {
+  activeStreamId: string | null;
+  errorMessage: string;
+  onPlay: (
+    id: string,
+    url: string
+  ) => Promise<void>;
+  onStop: () => void;
+  onClose: () => void;
+}) {
+  const backdrop =
+    useBackdropDismiss(onClose);
+
+  return (
+    <div
+      className="ts-dialog-backdrop"
+      {...backdrop}
+    >
+      <div
+        className="ts-dialog ptt-audio-player-dialog"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+        <div className="ts-dialog-titlebar">
+          <span>
+            📻 Audio Players / Streams
+          </span>
+
+          <button
+            type="button"
+            onClick={onClose}
+            title="Sluiten"
+            aria-label="Sluiten"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="ts-dialog-body">
+          <p className="ptt-audio-player-intro">
+            Luister naar een audiostream.
+            De stream wordt alleen op jouw
+            computer afgespeeld.
+          </p>
+
+          <div className="ptt-audio-player-list">
+            {PTT_AUDIO_STREAMS.map(
+              (stream) => {
+                const active =
+                  activeStreamId ===
+                  stream.id;
+
+                return (
+                  <div
+                    key={stream.id}
+                    className={
+                      "ptt-audio-player-row" +
+                      (
+                        active
+                          ? " ptt-audio-player-row-active"
+                          : ""
+                      )
+                    }
+                  >
+                    <div className="ptt-audio-player-info">
+                      <strong>
+                        {stream.name}
+                      </strong>
+
+                      <span>
+                        {stream.url}
+                      </span>
+                    </div>
+
+                    <div className="ptt-audio-player-actions">
+                      <button
+                        type="button"
+                        disabled={active}
+                        onClick={() =>
+                          void onPlay(
+                            stream.id,
+                            stream.url
+                          )
+                        }
+                      >
+                        ▶ Aan
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!active}
+                        onClick={onStop}
+                      >
+                        ■ Uit
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+
+          {errorMessage && (
+            <div className="ptt-audio-player-error">
+              ⚠️ {errorMessage}
+            </div>
+          )}
+
+          <div className="ptt-audio-player-note">
+            <div>
+              • Er kan maar één stream
+              tegelijk actief zijn.
+            </div>
+
+            <div>
+              • Een stream start nooit
+              automatisch.
+            </div>
+
+            <div>
+              • Push-To-Talk blijft
+              gewoon werken.
+            </div>
+
+            <div>
+              • Het sluiten van dit
+              venster stopt de stream niet.
+            </div>
+          </div>
+        </div>
+
+        <div className="ts-dialog-buttons">
+          <button
+            type="button"
+            onClick={onStop}
+            disabled={!activeStreamId}
+          >
+            ■ Alles uit
+          </button>
+
+          <div className="ts-dialog-buttons-right">
+            <button
+              type="button"
+              onClick={onClose}
+            >
+              Sluiten
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+'''
+
+app = replace_once(
+    app,
+    '''function HotkeysPanel({
+''',
+    audio_dialog +
+    '''function HotkeysPanel({
+''',
+    "PTT audio player dialog"
+)
+
+
+# ============================================================
 # HOTKEY PANEL
 # ============================================================
 
@@ -946,9 +1089,7 @@ hotkey_panel = '''function HotkeysPanel({
           Push-To-Talk
         </legend>
 
-        <div
-          className="ts-options-field-row"
-        >
+        <div className="ts-options-field-row">
           <strong>
             Gekozen toets:
           </strong>
@@ -1048,7 +1189,7 @@ app = replace_once(
 
 
 # ============================================================
-# PTT STATE
+# PTT + PLAYER STATE
 # ============================================================
 
 app = replace_once(
@@ -1091,6 +1232,41 @@ app = replace_once(
   );
 ''',
     "PTT React state"
+)
+
+
+app = replace_once(
+    app,
+    '''  const [extrasMenuOpen, setExtrasMenuOpen] = useState(false);
+''',
+    '''  const [extrasMenuOpen, setExtrasMenuOpen] = useState(false);
+
+  const [
+    audioPlayersOpen,
+    setAudioPlayersOpen
+  ] = useState(false);
+
+  const [
+    audioPlayersQuickOpen,
+    setAudioPlayersQuickOpen
+  ] = useState(false);
+
+  const [
+    activeAudioStreamId,
+    setActiveAudioStreamId
+  ] = useState<string | null>(null);
+
+  const [
+    audioStreamError,
+    setAudioStreamError
+  ] = useState("");
+
+  const audioStreamElementRef =
+    useRef<HTMLAudioElement | null>(
+      null
+    );
+''',
+    "PTT audio player state"
 )
 
 
@@ -1146,6 +1322,130 @@ app = replace_once(
   useEffect(() => {
 ''',
     "save PTT settings"
+)
+
+
+# ============================================================
+# PLAYER START / STOP
+# ============================================================
+
+player_handlers = r'''  const stopPttAudioStream = () => {
+    const current =
+      audioStreamElementRef.current;
+
+    if (current) {
+      try {
+        current.pause();
+      } catch {
+      }
+
+      current.removeAttribute(
+        "src"
+      );
+
+      try {
+        current.load();
+      } catch {
+      }
+    }
+
+    audioStreamElementRef.current =
+      null;
+
+    setActiveAudioStreamId(
+      null
+    );
+
+    setAudioStreamError("");
+  };
+
+  const startPttAudioStream = async (
+    id: string,
+    url: string
+  ) => {
+    stopPttAudioStream();
+
+    setAudioStreamError("");
+
+    const audio =
+      new Audio();
+
+    audio.autoplay =
+      false;
+
+    audio.preload =
+      "none";
+
+    audio.src =
+      url;
+
+    audio.volume =
+      1;
+
+    audioStreamElementRef.current =
+      audio;
+
+    setActiveAudioStreamId(
+      id
+    );
+
+    audio.addEventListener(
+      "error",
+      () => {
+        if (
+          audioStreamElementRef.current !==
+          audio
+        ) {
+          return;
+        }
+
+        setAudioStreamError(
+          "Deze stream kon niet worden afgespeeld."
+        );
+
+        setActiveAudioStreamId(
+          null
+        );
+
+        audioStreamElementRef.current =
+          null;
+      },
+      {
+        once: true
+      }
+    );
+
+    try {
+      await audio.play();
+    } catch {
+      if (
+        audioStreamElementRef.current ===
+        audio
+      ) {
+        setAudioStreamError(
+          "Deze stream kon niet worden gestart."
+        );
+
+        setActiveAudioStreamId(
+          null
+        );
+
+        audioStreamElementRef.current =
+          null;
+      }
+    }
+  };
+
+'''
+
+app = replace_once(
+    app,
+    '''  const handleInputDeviceChange = (deviceId: string) => {
+''',
+    player_handlers +
+    '''  const handleInputDeviceChange = (deviceId: string) => {
+''',
+    "PTT audio player handlers"
 )
 
 
@@ -1356,6 +1656,240 @@ app = replace_once(
 )
 
 
+# ============================================================
+# TOOLS MENU - AUDIO PLAYERS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''              <div className="ts-menu-separator" />
+              <button
+                className="ts-menu-item"
+                onClick={() => {
+                  setOptionsDialogOpen(true);
+                  setExtrasMenuOpen(false);
+                }}
+              >
+                <span className="ts-menu-item-icon">⚙️</span>
+                <span className="ts-menu-item-label">{t("menu.extras.options")}</span>
+              </button>
+''',
+    '''              <div className="ts-menu-separator" />
+
+              <button
+                className="ts-menu-item"
+                onClick={() => {
+                  setAudioPlayersOpen(true);
+                  setAudioPlayersQuickOpen(false);
+                  setExtrasMenuOpen(false);
+                }}
+              >
+                <span className="ts-menu-item-icon">
+                  📻
+                </span>
+
+                <span className="ts-menu-item-label">
+                  Audio Players / Streams
+                </span>
+              </button>
+
+              <div className="ts-menu-separator" />
+
+              <button
+                className="ts-menu-item"
+                onClick={() => {
+                  setOptionsDialogOpen(true);
+                  setExtrasMenuOpen(false);
+                }}
+              >
+                <span className="ts-menu-item-icon">⚙️</span>
+                <span className="ts-menu-item-label">{t("menu.extras.options")}</span>
+              </button>
+''',
+    "Audio Players under Tools"
+)
+
+
+# ============================================================
+# SNELKNOP NAAST ZONNETJE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          <button
+            className="ts-icon-button"
+            onClick={() => setTheme((mode) => (mode === "dark" ? "light" : "dark"))}
+            title={t("toolbar.toggleTheme")}
+            aria-label={t("toolbar.toggleTheme")}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    '''          <button
+            className="ts-icon-button"
+            onClick={() => setTheme((mode) => (mode === "dark" ? "light" : "dark"))}
+            title={t("toolbar.toggleTheme")}
+            aria-label={t("toolbar.toggleTheme")}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+
+          <div className="ptt-stream-quick">
+            <button
+              type="button"
+              className={
+                "ts-icon-button" +
+                (
+                  activeAudioStreamId
+                    ? " ptt-stream-active"
+                    : ""
+                )
+              }
+              onClick={() =>
+                setAudioPlayersQuickOpen(
+                  (open) => !open
+                )
+              }
+              title="Audio Players / Streams"
+              aria-label="Audio Players / Streams"
+              aria-expanded={audioPlayersQuickOpen}
+            >
+              🎧
+            </button>
+
+            {audioPlayersQuickOpen && (
+              <div className="ts-menu ptt-stream-quick-menu">
+                <div className="ptt-stream-quick-title">
+                  📻 Audio Players / Streams
+                </div>
+
+                {PTT_AUDIO_STREAMS.map(
+                  (stream) => {
+                    const active =
+                      activeAudioStreamId ===
+                      stream.id;
+
+                    return (
+                      <button
+                        key={stream.id}
+                        type="button"
+                        className={
+                          "ts-menu-item" +
+                          (
+                            active
+                              ? " ptt-stream-menu-active"
+                              : ""
+                          )
+                        }
+                        onClick={() => {
+                          if (active) {
+                            stopPttAudioStream();
+                          } else {
+                            void startPttAudioStream(
+                              stream.id,
+                              stream.url
+                            );
+                          }
+                        }}
+                      >
+                        <span className="ts-menu-item-icon">
+                          {active ? "■" : "▶"}
+                        </span>
+
+                        <span className="ts-menu-item-label">
+                          {stream.name}
+                        </span>
+
+                        <span className="ptt-stream-status">
+                          {active ? "AAN" : ""}
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
+
+                <div className="ts-menu-separator" />
+
+                <button
+                  type="button"
+                  className="ts-menu-item"
+                  onClick={() => {
+                    setAudioPlayersOpen(true);
+                    setAudioPlayersQuickOpen(false);
+                  }}
+                >
+                  <span className="ts-menu-item-icon">
+                    ⚙️
+                  </span>
+
+                  <span className="ts-menu-item-label">
+                    Player openen
+                  </span>
+                </button>
+
+                {activeAudioStreamId && (
+                  <button
+                    type="button"
+                    className="ts-menu-item"
+                    onClick={() => {
+                      stopPttAudioStream();
+                      setAudioPlayersQuickOpen(false);
+                    }}
+                  >
+                    <span className="ts-menu-item-icon">
+                      ■
+                    </span>
+
+                    <span className="ts-menu-item-label">
+                      Stream uit
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    "Audio player toolbar quick button"
+)
+
+
+# ============================================================
+# PLAYER DIALOG TONEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      {restartNotice && <RestartNoticeDialog message={restartNotice} onAck={() => setRestartNotice(null)} />}
+''',
+    '''      {audioPlayersOpen && (
+        <PttAudioPlayersDialog
+          activeStreamId={
+            activeAudioStreamId
+          }
+          errorMessage={
+            audioStreamError
+          }
+          onPlay={
+            startPttAudioStream
+          }
+          onStop={
+            stopPttAudioStream
+          }
+          onClose={() =>
+            setAudioPlayersOpen(false)
+          }
+        />
+      )}
+
+      {restartNotice && <RestartNoticeDialog message={restartNotice} onAck={() => setRestartNotice(null)} />}
+''',
+    "Audio player dialog render"
+)
+
+
 APP_FILE.write_text(
     app,
     encoding="utf-8"
@@ -1475,7 +2009,166 @@ ptt_css = r'''
   }
 }
 
+
+/* ==========================================================
+   PTT Connect Audio Players / Streams
+   ========================================================== */
+
+.ptt-stream-quick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ptt-stream-quick-menu {
+  position: absolute !important;
+  top: calc(100% + 5px);
+  right: 0;
+  left: auto !important;
+  min-width: 260px;
+  z-index: 10000;
+}
+
+.ptt-stream-quick-title {
+  padding: 8px 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.ptt-stream-active {
+  box-shadow:
+    inset 0 0 0 1px
+      rgba(0, 200, 255, 0.65),
+    0 0 8px
+      rgba(0, 180, 255, 0.35);
+}
+
+.ptt-stream-menu-active {
+  font-weight: 700;
+}
+
+.ptt-stream-status {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #46c8ff;
+}
+
+.ptt-audio-player-dialog {
+  width: min(
+    720px,
+    calc(100vw - 50px)
+  );
+}
+
+.ptt-audio-player-intro {
+  margin-top: 0;
+  opacity: 0.9;
+}
+
+.ptt-audio-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ptt-audio-player-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  padding: 12px;
+
+  border:
+    1px solid
+    rgba(255,255,255,0.10);
+
+  border-radius: 6px;
+}
+
+.ptt-audio-player-row-active {
+  border-color:
+    rgba(0, 190, 255, 0.65);
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(0, 190, 255, 0.15);
+}
+
+.ptt-audio-player-info {
+  flex: 1;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ptt-audio-player-info strong {
+  font-size: 1rem;
+}
+
+.ptt-audio-player-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 0.82rem;
+  opacity: 0.72;
+}
+
+.ptt-audio-player-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ptt-audio-player-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+
+  border:
+    1px solid
+    rgba(255,255,255,0.10);
+
+  border-radius: 6px;
+
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.ptt-audio-player-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+
+  border:
+    1px solid
+    rgba(255, 90, 90, 0.55);
+
+  border-radius: 6px;
+
+  color: #ffb0b0;
+}
+
+@media (max-width: 700px) {
+  .ptt-audio-player-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ptt-audio-player-actions {
+    width: 100%;
+  }
+
+  .ptt-audio-player-actions button {
+    flex: 1;
+  }
+}
+
 '''
+
 
 if "PTT Connect desktop styling" not in css:
     css += ptt_css
@@ -1516,7 +2209,7 @@ print(
 )
 
 print(
-    "- blauwe bollen zijn rood"
+    "- rode bollen actief"
 )
 
 print(
@@ -1528,17 +2221,33 @@ print(
 )
 
 print(
-    "- verborgen HTML audio buffer verwijderd"
+    "- PI2NOS player toegevoegd"
 )
 
 print(
-    "- normale playback snelheid 1.0"
+    "- PI3UTR player toegevoegd"
 )
 
 print(
-    "- bij te grote achterstand terug naar live"
+    "- PI3GOE player toegevoegd"
 )
 
 print(
-    "- microfoon/PTT zendkant verder niet aangepast"
+    "- maximaal 1 stream tegelijk"
+)
+
+print(
+    "- streams starten nooit automatisch"
+)
+
+print(
+    "- snelknop naast zonnetje toegevoegd"
+)
+
+print(
+    "- Audio Players ook onder Tools toegevoegd"
+)
+
+print(
+    "- PTT en microfoon verder niet aangepast"
 )
