@@ -4,6 +4,7 @@ from pathlib import Path
 APP_FILE = Path("upstream/web/src/App.tsx")
 VOICE_FILE = Path("upstream/web/src/voice.ts")
 CSS_FILE = Path("upstream/web/src/App.css")
+GATEWAY_FILE = Path("upstream/gateway/src/index.ts")
 
 
 def replace_once(text, old, new, name):
@@ -130,9 +131,7 @@ voice = replace_once(
     mode: TransmissionMode
   ): void {
     this.transmissionMode = mode;
-
     this.activeUntil = 0;
-
     this.pushToTalkActive = false;
   }
 
@@ -329,7 +328,6 @@ voice = replace_once(
 ''',
     '''  reset(): void {
     this.clearScheduledAudio();
-
     this.nextTime = 0;
   }
 ''',
@@ -379,9 +377,7 @@ voice = replace_once(
 
   dispose(): void {
     this.clearScheduledAudio();
-
     this.nextTime = 0;
-
     this.detachAecRenderTap();
 
     try {
@@ -423,7 +419,7 @@ app = replace_once(
 
 
 # ============================================================
-# OPSLAG
+# OPSLAG + STREAMS
 # ============================================================
 
 app = replace_once(
@@ -634,7 +630,7 @@ app = replace_once(
     app,
     number_loader,
     number_loader_new,
-    "PTT preference loaders and audio streams"
+    "PTT preference loaders and streams"
 )
 
 
@@ -663,7 +659,7 @@ app = replace_once(
 
 
 # ============================================================
-# AUTOMATISCH PTT CONNECT ACHTER NAAM
+# NAAM PTT CONNECT
 # ============================================================
 
 app = replace_once(
@@ -746,10 +742,6 @@ app = replace_once(
 )
 
 
-# ============================================================
-# TRANSMISSION MODES
-# ============================================================
-
 old_modes = '''            <label className="ts-options-radio">
               <input type="radio" name="activation" disabled readOnly />
               {t("recording.pushToTalk")}
@@ -779,7 +771,6 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
-
               {t("recording.pushToTalk")}
             </label>
 
@@ -797,7 +788,6 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
-
               {t("recording.continuous")}
             </label>
 
@@ -815,7 +805,6 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
-
               {t("recording.voiceActivation")}
             </label>
 '''
@@ -872,15 +861,13 @@ function PttAudioPlayersDialog({
           <button
             type="button"
             onClick={onClose}
-            title="Sluiten"
-            aria-label="Sluiten"
           >
             ✕
           </button>
         </div>
 
         <div className="ts-dialog-body">
-          <p className="ptt-audio-player-intro">
+          <p>
             Luister naar een audiostream.
             De stream wordt alleen op jouw
             computer afgespeeld.
@@ -951,23 +938,16 @@ function PttAudioPlayersDialog({
 
           <div className="ptt-audio-player-note">
             <div>
-              • Er kan maar één stream
-              tegelijk actief zijn.
+              • Er kan maar één stream tegelijk actief zijn.
             </div>
-
             <div>
-              • Een stream start nooit
-              automatisch.
+              • Een stream start nooit automatisch.
             </div>
-
             <div>
-              • Push-To-Talk blijft
-              gewoon werken.
+              • Push-To-Talk blijft gewoon werken.
             </div>
-
             <div>
-              • Het sluiten van dit
-              venster stopt de stream niet.
+              • Sluiten van dit venster stopt de stream niet.
             </div>
           </div>
         </div>
@@ -998,8 +978,6 @@ function PttAudioPlayersDialog({
 '''
 
 
-# GECORRIGEERD:
-# Player dialog wordt ingevoegd vóór AnwendungPanel.
 app = replace_once(
     app,
     '''function AnwendungPanel({
@@ -1036,18 +1014,14 @@ hotkey_panel = '''function HotkeysPanel({
       event: KeyboardEvent
     ) => {
       event.preventDefault();
-
       event.stopPropagation();
-
       event.stopImmediatePropagation();
 
       if (event.repeat) {
         return;
       }
 
-      if (
-        event.code === "Escape"
-      ) {
+      if (event.code === "Escape") {
         setLearningPtt(false);
         return;
       }
@@ -1139,31 +1113,12 @@ hotkey_panel = '''function HotkeysPanel({
           )}
         </div>
 
-        {learningPtt ? (
-          <p className="ts-options-hint">
-            Druk nu op de toets die je
-            wilt gebruiken om te praten.
-            Druk op Escape om te annuleren.
-          </p>
-        ) : (
-          <p className="ts-options-hint">
-            Iedere gebruiker kan hier
-            zijn eigen Push-To-Talk toets
-            kiezen.
-          </p>
-        )}
+        <p className="ts-options-hint">
+          Iedere gebruiker kan hier
+          zijn eigen Push-To-Talk toets
+          kiezen.
+        </p>
       </fieldset>
-
-      <p className="ts-options-hint">
-        Houd de gekozen toets ingedrukt
-        om te praten en laat de toets los
-        om te stoppen.
-      </p>
-
-      <p className="ts-options-hint">
-        De gekozen toets wordt
-        automatisch opgeslagen.
-      </p>
     </>
   );
 }
@@ -1244,7 +1199,7 @@ app = replace_once(
 
 
 # ============================================================
-# AUDIO PLAYER STATE
+# PLAYER STATE
 # ============================================================
 
 app = replace_once(
@@ -1283,7 +1238,7 @@ app = replace_once(
 
 
 # ============================================================
-# INSTELLINGEN OPSLAAN
+# OPSLAAN
 # ============================================================
 
 app = replace_once(
@@ -1338,7 +1293,7 @@ app = replace_once(
 
 
 # ============================================================
-# AUDIO PLAYER START / STOP
+# PLAYER START / STOP
 # ============================================================
 
 player_handlers = r'''  const stopPttAudioStream = () => {
@@ -1375,20 +1330,20 @@ player_handlers = r'''  const stopPttAudioStream = () => {
     id: string,
     url: string
   ) => {
-    // Eerst een eventueel actieve
-    // andere stream stoppen.
     stopPttAudioStream();
 
     setAudioStreamError("");
 
     const audio =
-      new Audio();
-
-    audio.autoplay =
-      false;
+      document.createElement(
+        "audio"
+      );
 
     audio.preload =
       "none";
+
+    audio.autoplay =
+      false;
 
     audio.src =
       url;
@@ -1465,7 +1420,7 @@ app = replace_once(
 
 
 # ============================================================
-# PTT HOTKEY HANDLER
+# HOTKEY CHANGE
 # ============================================================
 
 ptt_hotkey_handler = '''  const handlePttHotkeyChange = (
@@ -1500,7 +1455,7 @@ app = replace_once(
 
 
 # ============================================================
-# TRANSMISSION MODE NAAR MICROFOON
+# MICROFOON TRANSMISSION MODE
 # ============================================================
 
 app = replace_once(
@@ -1674,7 +1629,7 @@ app = replace_once(
 
 
 # ============================================================
-# TOOLS MENU - AUDIO PLAYERS
+# TOOLS MENU
 # ============================================================
 
 app = replace_once(
@@ -1769,8 +1724,6 @@ app = replace_once(
                 )
               }
               title="Audio Players / Streams"
-              aria-label="Audio Players / Streams"
-              aria-expanded={audioPlayersQuickOpen}
             >
               📻
             </button>
@@ -1791,14 +1744,7 @@ app = replace_once(
                       <button
                         key={stream.id}
                         type="button"
-                        className={
-                          "ts-menu-item" +
-                          (
-                            active
-                              ? " ptt-stream-menu-active"
-                              : ""
-                          )
-                        }
+                        className="ts-menu-item"
                         onClick={() => {
                           if (active) {
                             stopPttAudioStream();
@@ -1874,7 +1820,7 @@ app = replace_once(
 
 
 # ============================================================
-# PLAYER DIALOG TONEN
+# PLAYER DIALOG
 # ============================================================
 
 app = replace_once(
@@ -1914,7 +1860,37 @@ APP_FILE.write_text(
 
 
 # ============================================================
-# APP.CSS
+# GATEWAY
+#
+# BELANGRIJKE FIX:
+# WebSpeak3 blokkeert standaard externe audio.
+# We staan HTTPS media toe zodat Hobbyscoop streams
+# werkelijk afgespeeld mogen worden.
+# ============================================================
+
+gateway = GATEWAY_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+gateway = replace_once(
+    gateway,
+    '''  "media-src 'self' data: blob:",
+''',
+    '''  "media-src 'self' data: blob: https:",
+''',
+    "allow HTTPS audio streams in CSP"
+)
+
+
+GATEWAY_FILE.write_text(
+    gateway,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS
 # ============================================================
 
 css = CSS_FILE.read_text(
@@ -1964,7 +1940,6 @@ ptt_css = r'''
   min-height: 180px;
 }
 
-/* Idle gebruiker rood */
 .ts-talk-lamp-idle {
   background:
     radial-gradient(
@@ -1983,7 +1958,6 @@ ptt_css = r'''
       rgba(0, 0, 0, 0.30) !important;
 }
 
-/* Pratende gebruiker groen */
 .ts-talk-lamp-talking {
   box-shadow:
     inset 0 1px 1px
@@ -2007,28 +1981,15 @@ ptt_css = r'''
   padding-top: 0.2rem;
 }
 
-.ts-info-title {
-  align-items: center;
-}
-
-.ts-info-row {
-  align-items: baseline;
-}
-
 @media (min-width: 1300px) {
   .ts-tree-panel {
     min-width: 320px;
-  }
-
-  .ts-info-panel {
-    padding-left: 1.1rem;
-    padding-right: 1.1rem;
   }
 }
 
 
 /* ==========================================================
-   PTT Connect Audio Players / Streams
+   Audio Players / Streams
    ========================================================== */
 
 .ptt-stream-quick {
@@ -2050,7 +2011,6 @@ ptt_css = r'''
   padding: 8px 12px;
   font-weight: 700;
   white-space: nowrap;
-  opacity: 0.9;
 }
 
 .ptt-stream-active {
@@ -2059,10 +2019,6 @@ ptt_css = r'''
       rgba(0, 200, 255, 0.65),
     0 0 8px
       rgba(0, 180, 255, 0.35);
-}
-
-.ptt-stream-menu-active {
-  font-weight: 700;
 }
 
 .ptt-stream-status {
@@ -2080,11 +2036,6 @@ ptt_css = r'''
   );
 }
 
-.ptt-audio-player-intro {
-  margin-top: 0;
-  opacity: 0.9;
-}
-
 .ptt-audio-player-list {
   display: flex;
   flex-direction: column;
@@ -2095,7 +2046,6 @@ ptt_css = r'''
   display: flex;
   align-items: center;
   gap: 16px;
-
   padding: 12px;
 
   border:
@@ -2107,11 +2057,7 @@ ptt_css = r'''
 
 .ptt-audio-player-row-active {
   border-color:
-    rgba(0, 190, 255, 0.65);
-
-  box-shadow:
-    inset 0 0 0 1px
-    rgba(0, 190, 255, 0.15);
+    rgba(0,190,255,0.65);
 }
 
 .ptt-audio-player-info {
@@ -2121,10 +2067,6 @@ ptt_css = r'''
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.ptt-audio-player-info strong {
-  font-size: 1rem;
 }
 
 .ptt-audio-player-info span {
@@ -2139,7 +2081,6 @@ ptt_css = r'''
 .ptt-audio-player-actions {
   display: flex;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .ptt-audio-player-note {
@@ -2153,7 +2094,6 @@ ptt_css = r'''
   border-radius: 6px;
 
   line-height: 1.6;
-  opacity: 0.85;
 }
 
 .ptt-audio-player-error {
@@ -2162,7 +2102,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    rgba(255, 90, 90, 0.55);
+    rgba(255,90,90,0.55);
 
   border-radius: 6px;
 
@@ -2171,12 +2111,8 @@ ptt_css = r'''
 
 @media (max-width: 700px) {
   .ptt-audio-player-row {
-    align-items: stretch;
     flex-direction: column;
-  }
-
-  .ptt-audio-player-actions {
-    width: 100%;
+    align-items: stretch;
   }
 
   .ptt-audio-player-actions button {
@@ -2202,51 +2138,31 @@ print(
 )
 
 print(
-    "- gebruiker kiest zelf server"
+    "- Push-To-Talk behouden"
 )
 
 print(
-    "- bookmarks blijven werken"
+    "- microfoon zendkant niet gewijzigd"
 )
 
 print(
-    "- Push-To-Talk blijft actief"
+    "- TeamSpeak ontvangstaudio behouden"
 )
 
 print(
-    "- gebruiker kiest zelf PTT-toets"
+    "- PI2NOS toegevoegd"
 )
 
 print(
-    "- PTT-toets wordt opgeslagen"
+    "- PI3UTR toegevoegd"
 )
 
 print(
-    "- naam krijgt automatisch PTT Connect"
+    "- PI3GOE toegevoegd"
 )
 
 print(
-    "- rode bollen actief"
-)
-
-print(
-    "- layout netjes uitgelijnd"
-)
-
-print(
-    "- ontvangstaudio rechtstreeks via AudioContext"
-)
-
-print(
-    "- PI2NOS player toegevoegd"
-)
-
-print(
-    "- PI3UTR player toegevoegd"
-)
-
-print(
-    "- PI3GOE player toegevoegd"
+    "- externe HTTPS audiostreams toegestaan"
 )
 
 print(
@@ -2258,13 +2174,9 @@ print(
 )
 
 print(
-    "- snelknop naast zonnetje toegevoegd"
+    "- snelknop naast zonnetje"
 )
 
 print(
-    "- Audio Players ook onder Tools toegevoegd"
-)
-
-print(
-    "- PTT en microfoon verder niet aangepast"
+    "- players ook onder Tools"
 )
