@@ -455,6 +455,7 @@ number_loader = '''function loadNumberPref(key: string, fallback: number): numbe
 }
 '''
 
+
 number_loader_new = '''const PTT_AUDIO_STREAMS = [
   {
     id: "pi2nos",
@@ -628,6 +629,7 @@ function redPttDots(
 }
 '''
 
+
 app = replace_once(
     app,
     number_loader,
@@ -762,6 +764,7 @@ old_modes = '''            <label className="ts-options-radio">
             </label>
 '''
 
+
 new_modes = '''            <label className="ts-options-radio">
               <input
                 type="radio"
@@ -816,6 +819,7 @@ new_modes = '''            <label className="ts-options-radio">
               {t("recording.voiceActivation")}
             </label>
 '''
+
 
 app = replace_once(
     app,
@@ -993,12 +997,15 @@ function PttAudioPlayersDialog({
 
 '''
 
+
+# GECORRIGEERD:
+# Player dialog wordt ingevoegd vóór AnwendungPanel.
 app = replace_once(
     app,
-    '''function HotkeysPanel({
+    '''function AnwendungPanel({
 ''',
     audio_dialog +
-    '''function HotkeysPanel({
+    '''function AnwendungPanel({
 ''',
     "PTT audio player dialog"
 )
@@ -1163,6 +1170,7 @@ hotkey_panel = '''function HotkeysPanel({
 
 '''
 
+
 app = replace_once(
     app,
     '''function AnwendungPanel({
@@ -1189,7 +1197,7 @@ app = replace_once(
 
 
 # ============================================================
-# PTT + PLAYER STATE
+# PTT STATE
 # ============================================================
 
 app = replace_once(
@@ -1234,6 +1242,10 @@ app = replace_once(
     "PTT React state"
 )
 
+
+# ============================================================
+# AUDIO PLAYER STATE
+# ============================================================
 
 app = replace_once(
     app,
@@ -1326,7 +1338,7 @@ app = replace_once(
 
 
 # ============================================================
-# PLAYER START / STOP
+# AUDIO PLAYER START / STOP
 # ============================================================
 
 player_handlers = r'''  const stopPttAudioStream = () => {
@@ -1363,6 +1375,8 @@ player_handlers = r'''  const stopPttAudioStream = () => {
     id: string,
     url: string
   ) => {
+    // Eerst een eventueel actieve
+    // andere stream stoppen.
     stopPttAudioStream();
 
     setAudioStreamError("");
@@ -1438,6 +1452,7 @@ player_handlers = r'''  const stopPttAudioStream = () => {
 
 '''
 
+
 app = replace_once(
     app,
     '''  const handleInputDeviceChange = (deviceId: string) => {
@@ -1471,6 +1486,7 @@ ptt_hotkey_handler = '''  const handlePttHotkeyChange = (
   };
 
 '''
+
 
 app = replace_once(
     app,
@@ -1614,6 +1630,7 @@ ptt_keyboard = '''  useEffect(() => {
 
 '''
 
+
 app = replace_once(
     app,
     '''  const handleToggleNoiseSuppression = () => {
@@ -1755,7 +1772,7 @@ app = replace_once(
               aria-label="Audio Players / Streams"
               aria-expanded={audioPlayersQuickOpen}
             >
-              🎧
+              📻
             </button>
 
             {audioPlayersQuickOpen && (
