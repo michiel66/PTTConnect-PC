@@ -25,13 +25,16 @@ def replace_once(text, old, new, name):
 
 # ============================================================
 # VOICE.TS
-# Push-To-Talk / Continuous / Voice Activation
 # ============================================================
 
 voice = VOICE_FILE.read_text(
     encoding="utf-8"
 )
 
+
+# ============================================================
+# PTT / TRANSMISSION MODES
+# ============================================================
 
 voice = replace_once(
     voice,
@@ -148,34 +151,88 @@ voice = replace_once(
 # ============================================================
 # DIRECTE TEAMSpeak ONTVANGSTAUDIO
 #
-# Alleen de LUISTER-kant.
-# Microfoon/PTT wordt hier NIET gewijzigd.
+# Oude route:
+# TeamSpeak
+# -> AudioContext
+# -> MediaStream
+# -> verborgen HTML audio element
+# -> Windows
 #
-# Als ontvangen audio te ver vooruit wordt ingepland,
-# gooien we de achterstallige playback weg en gaan
-# we terug naar bijna-live.
+# Nieuwe route:
+# TeamSpeak
+# -> AudioContext
+# -> Windows speakers
+#
+# Hierdoor verwijderen we een extra playback-buffer/resampler.
 # ============================================================
+
+voice = replace_once(
+    voice,
+    '''type SinkableElement = HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
+type SinkableContext = AudioContext & { setSinkId?: (id: string) => Promise<void> };
+''',
+    '''type SinkableContext =
+  AudioContext & {
+    setSinkId?: (
+      id: string
+    ) => Promise<void>;
+  };
+''',
+    "direct output sink types"
+)
+
 
 voice = replace_once(
     voice,
     '''export class AudioPlayer {
   private nextTime = 0;
+  private destination: MediaStreamAudioDestinationNode;
+  private element: SinkableElement;
+  private gain: GainNode;
 ''',
     '''export class AudioPlayer {
   private nextTime = 0;
 
   private scheduledSources =
     new Set<AudioBufferSourceNode>();
+
+  private gain: GainNode;
 ''',
-    "AudioPlayer scheduled sources"
+    "AudioPlayer direct fields"
 )
 
 
 voice = replace_once(
     voice,
-    '''  playFrame(base64Pcm: string): void {
+    '''  constructor(context: AudioContext) {
+    this.context = context;
+    this.destination = context.createMediaStreamDestination();
+    this.gain = context.createGain();
+    this.gain.connect(this.destination);
+    this.element = document.createElement("audio") as SinkableElement;
+    this.element.autoplay = true;
+    this.element.srcObject = this.destination.stream;
+    this.element.style.display = "none";
+    document.body.appendChild(this.element);
+  }
+
+  playFrame(base64Pcm: string): void {
 ''',
-    '''  private clearScheduledAudio(): void {
+    '''  constructor(context: AudioContext) {
+    this.context = context;
+
+    this.gain =
+      context.createGain();
+
+    // Rechtstreeks naar Windows / de gekozen
+    // AudioContext output. Geen verborgen
+    // HTML audio element meer ertussen.
+    this.gain.connect(
+      context.destination
+    );
+  }
+
+  private clearScheduledAudio(): void {
     for (
       const source of
       this.scheduledSources
@@ -183,13 +240,13 @@ voice = replace_once(
       try {
         source.stop();
       } catch {
-        // Source kan al afgelopen zijn.
+        // Kan al afgelopen zijn.
       }
 
       try {
         source.disconnect();
       } catch {
-        // Geen probleem als hij al los is.
+        // Kan al losgekoppeld zijn.
       }
     }
 
@@ -198,7 +255,7 @@ voice = replace_once(
 
   playFrame(base64Pcm: string): void {
 ''',
-    "AudioPlayer clear scheduled audio"
+    "AudioPlayer direct constructor"
 )
 
 
@@ -220,14 +277,17 @@ voice = replace_once(
     '''    const now =
       this.context.currentTime;
 
+    // Kleine buffer voor vloeiende spraak.
+    // We willen dicht bij live blijven.
     const minimumLead =
       0.02;
 
+    // Maximaal ongeveer 120 ms vooruit.
+    // Als dit groter wordt is er een
+    // achterstand ontstaan.
     const maximumLead =
       0.12;
 
-    // Eerste audioframe of playback is
-    // achter het huidige tijdstip geraakt.
     if (
       this.nextTime <
       now + minimumLead
@@ -236,9 +296,12 @@ voice = replace_once(
         now + minimumLead;
     }
 
-    // Als de wachtrij groter wordt dan
-    // 120 ms, blijven we niet oude audio
-    // afspelen. Spring terug naar live.
+    // Belangrijk:
+    // laat geen oude spraak langzaam
+    // afspelen en daarna versneld inhalen.
+    //
+    // Bij te grote achterstand springen
+    // we terug naar live.
     if (
       this.nextTime >
       now + maximumLead
@@ -254,6 +317,10 @@ voice = replace_once(
 
     source.buffer =
       buffer;
+
+    // Altijd normale afspeelsnelheid.
+    source.playbackRate.value =
+      1.0;
 
     source.connect(
       this.gain
@@ -282,7 +349,7 @@ voice = replace_once(
     this.nextTime +=
       frames / SAMPLE_RATE;
 ''',
-    "direct TeamSpeak receive audio"
+    "direct TeamSpeak live playback"
 )
 
 
@@ -298,25 +365,75 @@ voice = replace_once(
     this.nextTime = 0;
   }
 ''',
-    "AudioPlayer reset"
+    "AudioPlayer direct reset"
 )
 
 
+# ============================================================
+# OUTPUT DEVICE
+# AudioContext zelf kiest nu het Windows audio-apparaat.
+# ============================================================
+
 voice = replace_once(
     voice,
-    '''  dispose(): void {
+    '''  /** Routes playback to a specific device (empty string = system default). */
+  async setOutputDevice(deviceId: string): Promise<void> {
+    if (typeof this.element.setSinkId === "function") {
+      await this.element.setSinkId(deviceId);
+      return;
+    }
+    const ctx = this.context as SinkableContext;
+    if (typeof ctx.setSinkId === "function") {
+      await ctx.setSinkId(deviceId);
+    }
+    // Neither API is available - stays on the system default output.
+  }
+
+  dispose(): void {
     this.detachAecRenderTap();
     this.element.pause();
+    this.element.srcObject = null;
+    this.element.remove();
+    this.destination.stream.getTracks().forEach((t) => t.stop());
+  }
 ''',
-    '''  dispose(): void {
+    '''  /** Routes playback to a specific device (empty string = system default). */
+  async setOutputDevice(
+    deviceId: string
+  ): Promise<void> {
+    const ctx =
+      this.context as SinkableContext;
+
+    if (
+      typeof ctx.setSinkId ===
+      "function"
+    ) {
+      await ctx.setSinkId(
+        deviceId
+      );
+    }
+
+    // Moderne Electron/Chromium gebruikt
+    // AudioContext.setSinkId rechtstreeks.
+    // Als dat niet beschikbaar is blijft
+    // Windows' standaardapparaat actief.
+  }
+
+  dispose(): void {
     this.clearScheduledAudio();
 
     this.nextTime = 0;
 
     this.detachAecRenderTap();
-    this.element.pause();
+
+    try {
+      this.gain.disconnect();
+    } catch {
+      // Kan al losgekoppeld zijn.
+    }
+  }
 ''',
-    "AudioPlayer dispose"
+    "direct output device and dispose"
 )
 
 
@@ -556,7 +673,7 @@ app = replace_once(
 
 
 # ============================================================
-# GEEN VASTE SERVER
+# GEEN AUTOMATISCHE SERVER
 # ============================================================
 
 app = replace_once(
@@ -580,7 +697,7 @@ app = replace_once(
 
 
 # ============================================================
-# AUTOMATISCH "PTT Connect" ACHTER DE NAAM
+# AUTOMATISCH PTT CONNECT ACHTER NAAM
 # ============================================================
 
 app = replace_once(
@@ -598,7 +715,7 @@ app = replace_once(
 
 
 # ============================================================
-# BLAUWE SERVERBOLLEN -> RODE BOLLEN
+# RODE SERVERBOLLEN
 # ============================================================
 
 app = replace_once(
@@ -664,7 +781,7 @@ app = replace_once(
 
 
 # ============================================================
-# PUSH TO TALK / CONTINUOUS / VOICE ACTIVATION
+# TRANSMISSION MODES
 # ============================================================
 
 old_modes = '''            <label className="ts-options-radio">
@@ -745,7 +862,7 @@ app = replace_once(
 
 
 # ============================================================
-# HOTKEY SCHERM
+# HOTKEY PANEL
 # ============================================================
 
 hotkey_panel = '''function HotkeysPanel({
@@ -1033,7 +1150,7 @@ app = replace_once(
 
 
 # ============================================================
-# HANDLER VOOR NIEUWE PTT TOETS
+# PTT HOTKEY HANDLER
 # ============================================================
 
 ptt_hotkey_handler = '''  const handlePttHotkeyChange = (
@@ -1095,7 +1212,7 @@ app = replace_once(
 
 
 # ============================================================
-# PTT TOETS INGEDRUKT / LOSGELATEN
+# PTT TOETS
 # ============================================================
 
 ptt_keyboard = '''  useEffect(() => {
@@ -1209,7 +1326,7 @@ app = replace_once(
 
 
 # ============================================================
-# PTT INSTELLINGEN NAAR OPTIONS SCHERM
+# AUDIO SETTINGS DOORGEVEN
 # ============================================================
 
 app = replace_once(
@@ -1247,7 +1364,6 @@ APP_FILE.write_text(
 
 # ============================================================
 # APP.CSS
-# RODE BOLLEN + NETTERE UITLIJNING
 # ============================================================
 
 css = CSS_FILE.read_text(
@@ -1297,7 +1413,7 @@ ptt_css = r'''
   min-height: 180px;
 }
 
-/* Idle gebruiker = rood */
+/* Idle gebruiker rood */
 .ts-talk-lamp-idle {
   background:
     radial-gradient(
@@ -1316,7 +1432,7 @@ ptt_css = r'''
       rgba(0, 0, 0, 0.30) !important;
 }
 
-/* Pratende gebruiker blijft groen */
+/* Pratende gebruiker groen */
 .ts-talk-lamp-talking {
   box-shadow:
     inset 0 1px 1px
@@ -1384,7 +1500,7 @@ print(
 )
 
 print(
-    "- echte Push-To-Talk"
+    "- Push-To-Talk blijft actief"
 )
 
 print(
@@ -1404,21 +1520,25 @@ print(
 )
 
 print(
-    "- server blauwe emoji worden rood"
+    "- layout netjes uitgelijnd"
 )
 
 print(
-    "- desktop layout netjes uitgelijnd"
+    "- ontvangstaudio rechtstreeks via AudioContext"
 )
 
 print(
-    "- TeamSpeak ontvangstaudio blijft dicht bij live"
+    "- verborgen HTML audio buffer verwijderd"
 )
 
 print(
-    "- te grote luisterbuffer wordt automatisch weggegooid"
+    "- normale playback snelheid 1.0"
 )
 
 print(
-    "- microfoon/PTT zendkant niet gewijzigd"
+    "- bij te grote achterstand terug naar live"
+)
+
+print(
+    "- microfoon/PTT zendkant verder niet aangepast"
 )
