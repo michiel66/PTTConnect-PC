@@ -104,9 +104,6 @@ voice = replace_once(
           now + this.hangoverSeconds;
       }
 
-      // Shared audio remains active while it is
-      // being shared. Microphone audio follows
-      // the selected TeamSpeak transmission mode.
       const shouldBeActive =
         this.extra !== null ||
         this.transmissionMode === "continuous" ||
@@ -161,8 +158,6 @@ app = APP_FILE.read_text(
 )
 
 
-# Import TransmissionMode.
-
 app = replace_once(
     app,
     '''  MicCapture,
@@ -176,7 +171,9 @@ app = replace_once(
 )
 
 
-# Storage keys.
+# ============================================================
+# OPSLAG
+# ============================================================
 
 app = replace_once(
     app,
@@ -192,13 +189,13 @@ const TRANSMISSION_MODE_KEY =
 
 const PTT_HOTKEY_KEY =
   "pttconnect:ptt-hotkey";
+
+const PTT_HOTKEY_CUSTOMIZED_KEY =
+  "pttconnect:ptt-hotkey-customized";
 ''',
     "PTT storage keys"
 )
 
-
-# Load saved transmission mode.
-# PTT is the default for PTT Connect.
 
 number_loader = '''function loadNumberPref(key: string, fallback: number): number {
   const raw = localStorage.getItem(key);
@@ -229,18 +226,112 @@ function loadTransmissionMode(): TransmissionMode {
 
   return "ptt";
 }
+
+function loadPttHotkey(): string {
+  const customized =
+    localStorage.getItem(
+      PTT_HOTKEY_CUSTOMIZED_KEY
+    ) === "1";
+
+  if (!customized) {
+    return "";
+  }
+
+  return (
+    localStorage.getItem(
+      PTT_HOTKEY_KEY
+    ) ?? ""
+  );
+}
+
+function formatPttHotkey(
+  code: string
+): string {
+  if (!code) {
+    return "Nog geen PTT-toets gekozen";
+  }
+
+  const labels: Record<string, string> = {
+    Space: "Spatiebalk",
+
+    ControlLeft: "Linker Ctrl",
+    ControlRight: "Rechter Ctrl",
+
+    ShiftLeft: "Linker Shift",
+    ShiftRight: "Rechter Shift",
+
+    AltLeft: "Linker Alt",
+    AltRight: "Rechter Alt",
+
+    MetaLeft: "Linker Windows-toets",
+    MetaRight: "Rechter Windows-toets",
+
+    Enter: "Enter",
+    NumpadEnter: "Numpad Enter",
+
+    Tab: "Tab",
+    CapsLock: "Caps Lock",
+    Backspace: "Backspace",
+    Delete: "Delete",
+    Insert: "Insert",
+
+    Home: "Home",
+    End: "End",
+
+    PageUp: "Page Up",
+    PageDown: "Page Down",
+
+    ArrowUp: "Pijl omhoog",
+    ArrowDown: "Pijl omlaag",
+    ArrowLeft: "Pijl links",
+    ArrowRight: "Pijl rechts",
+
+    NumpadAdd: "Numpad +",
+    NumpadSubtract: "Numpad -",
+    NumpadMultiply: "Numpad *",
+    NumpadDivide: "Numpad /",
+    NumpadDecimal: "Numpad .",
+
+    Pause: "Pause",
+    ScrollLock: "Scroll Lock",
+    NumLock: "Num Lock",
+  };
+
+  if (labels[code]) {
+    return labels[code];
+  }
+
+  if (/^Key[A-Z]$/.test(code)) {
+    return code.slice(3);
+  }
+
+  if (/^Digit[0-9]$/.test(code)) {
+    return code.slice(5);
+  }
+
+  if (/^Numpad[0-9]$/.test(code)) {
+    return "Numpad " + code.slice(6);
+  }
+
+  if (/^F[0-9]{1,2}$/.test(code)) {
+    return code;
+  }
+
+  return code;
+}
 '''
 
 app = replace_once(
     app,
     number_loader,
     number_loader_new,
-    "TransmissionMode loader"
+    "PTT preference loaders"
 )
 
 
-# Do not put "localhost" in the server box.
-# User chooses the TeamSpeak server.
+# ============================================================
+# GEEN VASTE SERVER
+# ============================================================
 
 app = replace_once(
     app,
@@ -251,9 +342,6 @@ app = replace_once(
     "empty default server"
 )
 
-
-# Open the connection window at startup,
-# but do NOT connect automatically.
 
 app = replace_once(
     app,
@@ -266,7 +354,7 @@ app = replace_once(
 
 
 # ============================================================
-# AUDIO SETTINGS TYPE
+# AUDIO SETTINGS
 # ============================================================
 
 app = replace_once(
@@ -276,9 +364,12 @@ app = replace_once(
   noiseSuppressionEnabled: boolean;
 ''',
     '''  vadHangover: number;
-  onVadHangoverChange: (v: number) => void;
 
-  transmissionMode: TransmissionMode;
+  onVadHangoverChange:
+    (v: number) => void;
+
+  transmissionMode:
+    TransmissionMode;
 
   onTransmissionModeChange:
     (mode: TransmissionMode) => void;
@@ -295,8 +386,7 @@ app = replace_once(
 
 
 # ============================================================
-# RECORDING SETTINGS
-# Enable the three real transmission modes.
+# PUSH TO TALK / CONTINUOUS / VOICE ACTIVATION
 # ============================================================
 
 old_modes = '''            <label className="ts-options-radio">
@@ -318,7 +408,8 @@ new_modes = '''            <label className="ts-options-radio">
                 type="radio"
                 name="activation"
                 checked={
-                  audio.transmissionMode === "ptt"
+                  audio.transmissionMode ===
+                  "ptt"
                 }
                 onChange={() =>
                   audio.onTransmissionModeChange(
@@ -326,6 +417,7 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
+
               {t("recording.pushToTalk")}
             </label>
 
@@ -343,6 +435,7 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
+
               {t("recording.continuous")}
             </label>
 
@@ -351,7 +444,8 @@ new_modes = '''            <label className="ts-options-radio">
                 type="radio"
                 name="activation"
                 checked={
-                  audio.transmissionMode === "voice"
+                  audio.transmissionMode ===
+                  "voice"
                 }
                 onChange={() =>
                   audio.onTransmissionModeChange(
@@ -359,6 +453,7 @@ new_modes = '''            <label className="ts-options-radio">
                   )
                 }
               />
+
               {t("recording.voiceActivation")}
             </label>
 '''
@@ -372,7 +467,8 @@ app = replace_once(
 
 
 # ============================================================
-# HOTKEY SETTINGS PANEL
+# HOTKEY SCHERM
+# GEBRUIKER DRUKT ZELF OP GEWENSTE TOETS
 # ============================================================
 
 hotkey_panel = '''function HotkeysPanel({
@@ -381,6 +477,63 @@ hotkey_panel = '''function HotkeysPanel({
   audio: AudioSettings;
 }) {
   const t = useT();
+
+  const [
+    learningPtt,
+    setLearningPtt
+  ] = useState(false);
+
+  useEffect(() => {
+    if (!learningPtt) {
+      return;
+    }
+
+    const captureKey = (
+      event: KeyboardEvent
+    ) => {
+      event.preventDefault();
+
+      event.stopPropagation();
+
+      event.stopImmediatePropagation();
+
+      if (event.repeat) {
+        return;
+      }
+
+      if (event.code === "Escape") {
+        setLearningPtt(false);
+        return;
+      }
+
+      if (!event.code) {
+        return;
+      }
+
+      audio.onPttHotkeyChange(
+        event.code
+      );
+
+      setLearningPtt(false);
+    };
+
+    window.addEventListener(
+      "keydown",
+      captureKey,
+      true
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        captureKey,
+        true
+      );
+    };
+  }, [
+    learningPtt,
+    audio
+  ]);
 
   return (
     <>
@@ -392,67 +545,80 @@ hotkey_panel = '''function HotkeysPanel({
         PTT Connect Push-To-Talk
       </p>
 
-      <label className="ts-options-field">
-        Push-To-Talk toets
+      <fieldset className="ts-options-fieldset">
+        <legend>
+          Push-To-Talk
+        </legend>
 
-        <select
-          value={audio.pttHotkey}
-          onChange={(e) =>
-            audio.onPttHotkeyChange(
-              e.target.value
-            )
-          }
+        <div
+          className="ts-options-field-row"
         >
-          <option value="Space">
-            Spatiebalk
-          </option>
+          <strong>
+            Gekozen toets:
+          </strong>
 
-          <option value="ControlLeft">
-            Linker Ctrl
-          </option>
+          <span>
+            {formatPttHotkey(
+              audio.pttHotkey
+            )}
+          </span>
+        </div>
 
-          <option value="ControlRight">
-            Rechter Ctrl
-          </option>
+        <div
+          className="ts-options-field-row"
+          style={{
+            marginTop: "0.75rem"
+          }}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              setLearningPtt(true)
+            }
+          >
+            {learningPtt
+              ? "Druk nu op een toets..."
+              : audio.pttHotkey
+                ? "Wijzig PTT-toets"
+                : "Kies PTT-toets"}
+          </button>
 
-          <option value="ShiftLeft">
-            Linker Shift
-          </option>
+          {audio.pttHotkey && (
+            <button
+              type="button"
+              onClick={() =>
+                audio.onPttHotkeyChange("")
+              }
+            >
+              Wissen
+            </button>
+          )}
+        </div>
 
-          <option value="ShiftRight">
-            Rechter Shift
-          </option>
-
-          <option value="AltLeft">
-            Linker Alt
-          </option>
-
-          <option value="AltRight">
-            Rechter Alt
-          </option>
-
-          <option value="KeyV">
-            V
-          </option>
-
-          <option value="KeyX">
-            X
-          </option>
-
-          <option value="KeyC">
-            C
-          </option>
-        </select>
-      </label>
+        {learningPtt ? (
+          <p className="ts-options-hint">
+            Druk nu op de toets die je
+            wilt gebruiken om te praten.
+            Druk op Escape om te annuleren.
+          </p>
+        ) : (
+          <p className="ts-options-hint">
+            Iedere gebruiker kan hier
+            zijn eigen Push-To-Talk toets
+            kiezen.
+          </p>
+        )}
+      </fieldset>
 
       <p className="ts-options-hint">
         Houd de gekozen toets ingedrukt
-        om te praten.
+        om te praten en laat de toets los
+        om te stoppen.
       </p>
 
       <p className="ts-options-hint">
-        Deze eerste versie werkt zolang
-        het PTT Connect venster actief is.
+        De gekozen toets wordt
+        automatisch opgeslagen.
       </p>
     </>
   );
@@ -464,14 +630,12 @@ app = replace_once(
     app,
     '''function AnwendungPanel({
 ''',
-    hotkey_panel + '''function AnwendungPanel({
+    hotkey_panel +
+    '''function AnwendungPanel({
 ''',
     "HotkeysPanel"
 )
 
-
-# Make Hotkeys actually open the panel
-# instead of "not implemented".
 
 app = replace_once(
     app,
@@ -496,21 +660,25 @@ app = replace_once(
     '''  const [vadThreshold, setVadThreshold] = useState(0.02);
   const [vadHangover, setVadHangover] = useState(() => loadNumberPref(VAD_HANGOVER_KEY, 0.3));
 ''',
-    '''  const [vadThreshold, setVadThreshold] =
-    useState(() =>
-      loadNumberPref(
-        VAD_THRESHOLD_KEY,
-        0.02
-      )
-    );
+    '''  const [
+    vadThreshold,
+    setVadThreshold
+  ] = useState(() =>
+    loadNumberPref(
+      VAD_THRESHOLD_KEY,
+      0.02
+    )
+  );
 
-  const [vadHangover, setVadHangover] =
-    useState(() =>
-      loadNumberPref(
-        VAD_HANGOVER_KEY,
-        0.3
-      )
-    );
+  const [
+    vadHangover,
+    setVadHangover
+  ] = useState(() =>
+    loadNumberPref(
+      VAD_HANGOVER_KEY,
+      0.3
+    )
+  );
 
   const [
     transmissionMode,
@@ -523,10 +691,7 @@ app = replace_once(
     pttHotkey,
     setPttHotkey
   ] = useState(
-    () =>
-      localStorage.getItem(
-        PTT_HOTKEY_KEY
-      ) ?? "Space"
+    loadPttHotkey
   );
 ''',
     "PTT React state"
@@ -534,7 +699,7 @@ app = replace_once(
 
 
 # ============================================================
-# SAVE SETTINGS
+# INSTELLINGEN OPSLAAN
 # ============================================================
 
 app = replace_once(
@@ -570,10 +735,16 @@ app = replace_once(
   }, [transmissionMode]);
 
   useEffect(() => {
-    localStorage.setItem(
-      PTT_HOTKEY_KEY,
-      pttHotkey
-    );
+    if (pttHotkey) {
+      localStorage.setItem(
+        PTT_HOTKEY_KEY,
+        pttHotkey
+      );
+    } else {
+      localStorage.removeItem(
+        PTT_HOTKEY_KEY
+      );
+    }
   }, [pttHotkey]);
 
   useEffect(() => {
@@ -582,7 +753,43 @@ app = replace_once(
 )
 
 
-# Pass the transmission mode to MicCapture.
+# ============================================================
+# HANDLER VOOR NIEUWE PTT TOETS
+# ============================================================
+
+ptt_hotkey_handler = '''  const handlePttHotkeyChange = (
+    code: string
+  ) => {
+    setPttHotkey(code);
+
+    if (code) {
+      localStorage.setItem(
+        PTT_HOTKEY_CUSTOMIZED_KEY,
+        "1"
+      );
+    } else {
+      localStorage.removeItem(
+        PTT_HOTKEY_CUSTOMIZED_KEY
+      );
+    }
+  };
+
+'''
+
+app = replace_once(
+    app,
+    '''  const handleInputDeviceChange = (deviceId: string) => {
+''',
+    ptt_hotkey_handler +
+    '''  const handleInputDeviceChange = (deviceId: string) => {
+''',
+    "PTT hotkey change handler"
+)
+
+
+# ============================================================
+# TRANSMISSION MODE NAAR MICROFOON
+# ============================================================
 
 app = replace_once(
     app,
@@ -591,20 +798,25 @@ app = replace_once(
         deviceId: overrides?.deviceId ?? (inputDeviceId || undefined),
 ''',
     '''        threshold: vadThreshold,
-        hangoverSeconds: vadHangover,
+
+        hangoverSeconds:
+          vadHangover,
 
         transmissionMode,
 
         deviceId:
           overrides?.deviceId ??
-          (inputDeviceId || undefined),
+          (
+            inputDeviceId ||
+            undefined
+          ),
 ''',
     "MicCapture transmissionMode"
 )
 
 
 # ============================================================
-# HOLD-TO-TALK KEY HANDLING
+# PTT TOETS INGEDRUKT / LOSGELATEN
 # ============================================================
 
 ptt_keyboard = '''  useEffect(() => {
@@ -631,6 +843,7 @@ ptt_keyboard = '''  useEffect(() => {
     ) => {
       if (
         transmissionMode !== "ptt" ||
+        !pttHotkey ||
         event.code !== pttHotkey ||
         event.repeat ||
         isTextField(event.target)
@@ -648,10 +861,13 @@ ptt_keyboard = '''  useEffect(() => {
       event: KeyboardEvent
     ) => {
       if (
+        !pttHotkey ||
         event.code !== pttHotkey
       ) {
         return;
       }
+
+      event.preventDefault();
 
       micCaptureRef.current
         ?.setPushToTalk(false);
@@ -704,17 +920,17 @@ ptt_keyboard = '''  useEffect(() => {
 
 app = replace_once(
     app,
-    '''  const handleInputDeviceChange = (deviceId: string) => {
+    '''  const handleToggleNoiseSuppression = () => {
 ''',
     ptt_keyboard +
-    '''  const handleInputDeviceChange = (deviceId: string) => {
+    '''  const handleToggleNoiseSuppression = () => {
 ''',
     "PTT keyboard handling"
 )
 
 
 # ============================================================
-# SEND PTT SETTINGS INTO OPTIONS WINDOW
+# PTT INSTELLINGEN NAAR OPTIONS SCHERM
 # ============================================================
 
 app = replace_once(
@@ -736,7 +952,7 @@ app = replace_once(
             pttHotkey,
 
             onPttHotkeyChange:
-              setPttHotkey,
+              handlePttHotkeyChange,
 
             noiseSuppressionEnabled,
 ''',
@@ -753,18 +969,27 @@ APP_FILE.write_text(
 print(
     "PTT Connect patch succesvol toegepast"
 )
+
 print(
-    "- handmatig server kiezen"
+    "- gebruiker kiest zelf server"
 )
+
 print(
-    "- Push-To-Talk"
+    "- echte Push-To-Talk"
 )
+
+print(
+    "- gebruiker kiest zelf PTT-toets"
+)
+
+print(
+    "- PTT-toets wordt opgeslagen"
+)
+
 print(
     "- Continuous Transmission"
 )
+
 print(
     "- Voice Activation"
-)
-print(
-    "- instelbare PTT-toets"
 )
