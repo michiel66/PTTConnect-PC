@@ -419,7 +419,7 @@ app = replace_once(
 
 
 # ============================================================
-# OPSLAG + STREAMS
+# OPSLAG + KLEUREN + STREAMS
 # ============================================================
 
 app = replace_once(
@@ -439,6 +439,9 @@ const PTT_HOTKEY_KEY =
 
 const PTT_HOTKEY_CUSTOMIZED_KEY =
   "pttconnect:ptt-hotkey-customized";
+
+const PTT_COLOR_THEME_KEY =
+  "pttconnect:color-theme";
 ''',
     "PTT storage keys"
 )
@@ -452,7 +455,52 @@ number_loader = '''function loadNumberPref(key: string, fallback: number): numbe
 '''
 
 
-number_loader_new = '''const PTT_AUDIO_STREAMS = [
+number_loader_new = '''type PttColorTheme =
+  | "blue"
+  | "green"
+  | "red"
+  | "purple"
+  | "orange"
+  | "pink";
+
+const PTT_COLOR_THEMES: Array<{
+  id: PttColorTheme;
+  name: string;
+  swatch: string;
+}> = [
+  {
+    id: "blue",
+    name: "Blauw",
+    swatch: "#18aaff",
+  },
+  {
+    id: "green",
+    name: "Groen",
+    swatch: "#31c66d",
+  },
+  {
+    id: "red",
+    name: "Rood",
+    swatch: "#ff4d5a",
+  },
+  {
+    id: "purple",
+    name: "Paars",
+    swatch: "#a970ff",
+  },
+  {
+    id: "orange",
+    name: "Oranje",
+    swatch: "#ff9b3d",
+  },
+  {
+    id: "pink",
+    name: "Roze",
+    swatch: "#ff5ca8",
+  },
+];
+
+const PTT_AUDIO_STREAMS = [
   {
     id: "pi2nos",
     name: "PI2NOS",
@@ -474,6 +522,26 @@ function loadNumberPref(key: string, fallback: number): number {
   const raw = localStorage.getItem(key);
   const parsed = raw === null ? NaN : Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function loadPttColorTheme(): PttColorTheme {
+  const saved =
+    localStorage.getItem(
+      PTT_COLOR_THEME_KEY
+    );
+
+  if (
+    saved === "blue" ||
+    saved === "green" ||
+    saved === "red" ||
+    saved === "purple" ||
+    saved === "orange" ||
+    saved === "pink"
+  ) {
+    return saved;
+  }
+
+  return "blue";
 }
 
 function loadTransmissionMode(): TransmissionMode {
@@ -630,7 +698,7 @@ app = replace_once(
     app,
     number_loader,
     number_loader_new,
-    "PTT preference loaders and streams"
+    "PTT preference loaders colors and streams"
 )
 
 
@@ -1199,7 +1267,7 @@ app = replace_once(
 
 
 # ============================================================
-# PLAYER STATE
+# PLAYER + THEMA STATE
 # ============================================================
 
 app = replace_once(
@@ -1232,8 +1300,20 @@ app = replace_once(
     useRef<HTMLAudioElement | null>(
       null
     );
+
+  const [
+    pttColorTheme,
+    setPttColorTheme
+  ] = useState<PttColorTheme>(
+    loadPttColorTheme
+  );
+
+  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
 ''',
-    "PTT audio player state"
+    "PTT player and theme state"
 )
 
 
@@ -1629,6 +1709,24 @@ app = replace_once(
 
 
 # ============================================================
+# APP KLEURKLASSE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      className={`ts-app ts-theme-${theme}${designThemeClassName(designTheme)}${
+        activeCustomTheme ? " ts-design-custom" : ""
+      }${demoForceMobile ? " ts-force-mobile" : ""}${novaSplash ? " ts-nova-splash" : ""}`}
+''',
+    '''      className={`ts-app ts-theme-${theme}${designThemeClassName(designTheme)}${
+        activeCustomTheme ? " ts-design-custom" : ""
+      }${demoForceMobile ? " ts-force-mobile" : ""}${novaSplash ? " ts-nova-splash" : ""} ts-ptt-color-${pttColorTheme}`}
+''',
+    "PTT color theme app class"
+)
+
+
+# ============================================================
 # TOOLS MENU
 # ============================================================
 
@@ -1683,7 +1781,7 @@ app = replace_once(
 
 
 # ============================================================
-# SNELKNOP NAAST ZONNETJE
+# THEMA KNOP + PLAYER KNOP
 # ============================================================
 
 app = replace_once(
@@ -1698,14 +1796,116 @@ app = replace_once(
           </button>
           <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
 ''',
-    '''          <button
-            className="ts-icon-button"
-            onClick={() => setTheme((mode) => (mode === "dark" ? "light" : "dark"))}
-            title={t("toolbar.toggleTheme")}
-            aria-label={t("toolbar.toggleTheme")}
-          >
-            {theme === "dark" ? "☀️" : "🌙"}
-          </button>
+    '''          <div className="ptt-theme-quick">
+            <button
+              type="button"
+              className="ts-icon-button"
+              onClick={() =>
+                setPttThemeMenuOpen(
+                  (open) => !open
+                )
+              }
+              title="Kleurthema"
+              aria-label="Kleurthema"
+              aria-expanded={pttThemeMenuOpen}
+            >
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
+
+            {pttThemeMenuOpen && (
+              <div className="ts-menu ptt-theme-menu">
+                <div className="ptt-theme-menu-title">
+                  🎨 Kleurthema
+                </div>
+
+                {PTT_COLOR_THEMES.map(
+                  (colorTheme) => {
+                    const active =
+                      pttColorTheme ===
+                      colorTheme.id;
+
+                    return (
+                      <button
+                        key={colorTheme.id}
+                        type="button"
+                        className={
+                          "ts-menu-item" +
+                          (
+                            active
+                              ? " ptt-theme-menu-active"
+                              : ""
+                          )
+                        }
+                        onClick={() => {
+                          setPttColorTheme(
+                            colorTheme.id
+                          );
+
+                          localStorage.setItem(
+                            PTT_COLOR_THEME_KEY,
+                            colorTheme.id
+                          );
+
+                          setPttThemeMenuOpen(
+                            false
+                          );
+                        }}
+                      >
+                        <span
+                          className="ptt-theme-swatch"
+                          style={{
+                            background:
+                              colorTheme.swatch
+                          }}
+                        />
+
+                        <span className="ts-menu-item-label">
+                          {colorTheme.name}
+                        </span>
+
+                        {active && (
+                          <span className="ptt-theme-check">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  }
+                )}
+
+                <div className="ts-menu-separator" />
+
+                <button
+                  type="button"
+                  className="ts-menu-item"
+                  onClick={() => {
+                    setTheme(
+                      (mode) =>
+                        mode === "dark"
+                          ? "light"
+                          : "dark"
+                    );
+
+                    setPttThemeMenuOpen(
+                      false
+                    );
+                  }}
+                >
+                  <span className="ts-menu-item-icon">
+                    {theme === "dark"
+                      ? "☀️"
+                      : "🌙"}
+                  </span>
+
+                  <span className="ts-menu-item-label">
+                    {theme === "dark"
+                      ? "Lichte modus"
+                      : "Donkere modus"}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="ptt-stream-quick">
             <button
@@ -1815,7 +2015,7 @@ app = replace_once(
 
           <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
 ''',
-    "Audio player toolbar quick button"
+    "theme and audio player toolbar buttons"
 )
 
 
@@ -1896,10 +2096,15 @@ css = CSS_FILE.read_text(
 ptt_css = r'''
 
 /* ==========================================================
-   PTT CONNECT MODERN BLUE LOOK
+   PTT CONNECT MODERN LOOK
    ========================================================== */
 
 .ts-app {
+  --ptt-accent: #18aaff;
+  --ptt-accent-soft: #15527b;
+  --ptt-accent-dark: #0d4265;
+  --ptt-glow: rgba(24,170,255,0.35);
+
   height: 100vh;
   min-height: 100vh;
   box-sizing: border-box;
@@ -1924,15 +2129,67 @@ ptt_css = r'''
   box-sizing: border-box;
 }
 
+
+/* ==========================================================
+   KLEURTHEMA'S
+   ========================================================== */
+
+.ts-app.ts-ptt-color-blue {
+  --ptt-accent: #18aaff;
+  --ptt-accent-soft: #15527b;
+  --ptt-accent-dark: #0d4265;
+  --ptt-glow: rgba(24,170,255,0.35);
+}
+
+.ts-app.ts-ptt-color-green {
+  --ptt-accent: #31c66d;
+  --ptt-accent-soft: #287548;
+  --ptt-accent-dark: #17492c;
+  --ptt-glow: rgba(49,198,109,0.35);
+}
+
+.ts-app.ts-ptt-color-red {
+  --ptt-accent: #ff4d5a;
+  --ptt-accent-soft: #8e3440;
+  --ptt-accent-dark: #58242c;
+  --ptt-glow: rgba(255,77,90,0.35);
+}
+
+.ts-app.ts-ptt-color-purple {
+  --ptt-accent: #a970ff;
+  --ptt-accent-soft: #65459b;
+  --ptt-accent-dark: #3e2a65;
+  --ptt-glow: rgba(169,112,255,0.35);
+}
+
+.ts-app.ts-ptt-color-orange {
+  --ptt-accent: #ff9b3d;
+  --ptt-accent-soft: #945b2e;
+  --ptt-accent-dark: #5e391f;
+  --ptt-glow: rgba(255,155,61,0.35);
+}
+
+.ts-app.ts-ptt-color-pink {
+  --ptt-accent: #ff5ca8;
+  --ptt-accent-soft: #944069;
+  --ptt-accent-dark: #5d2944;
+  --ptt-glow: rgba(255,92,168,0.35);
+}
+
+
+/* ==========================================================
+   DONKERE BASIS
+   ========================================================== */
+
 .ts-app.ts-theme-dark {
   --bg: #071421;
   --bg-toolbar-1: #0b1d2d;
   --bg-toolbar-2: #10283b;
-  --border: #16486c;
+  --border: var(--ptt-accent-soft);
   --border-soft: #123753;
   --text: #f1f7fc;
   --text-muted: #8da9be;
-  --accent: #18aaff;
+  --accent: var(--ptt-accent);
   --input-bg: #0a1c2b;
   --input-text: #f3f8fc;
   --button-bg-1: #102a40;
@@ -1941,14 +2198,14 @@ ptt_css = r'''
   --button-bg-hover-2: #12344e;
   --row-hover: #123a57;
   --client-text: #e9f4fb;
-  --self-text: #4fc3ff;
+  --self-text: var(--ptt-accent);
   --log-bg: #071725;
   --log-text: #a8bed0;
 }
 
 
 /* ==========================================================
-   BOVENBALK
+   BOVENMENU
    ========================================================== */
 
 .ts-menubar {
@@ -1966,7 +2223,7 @@ ptt_css = r'''
 
   border-bottom:
     1px solid
-    #15527b !important;
+    var(--ptt-accent-soft) !important;
 
   box-shadow:
     0 2px 12px
@@ -2009,7 +2266,7 @@ ptt_css = r'''
 
   border-bottom:
     1px solid
-    #124568 !important;
+    var(--ptt-accent-soft) !important;
 }
 
 .ts-toolbar-icons {
@@ -2041,14 +2298,14 @@ ptt_css = r'''
 
 .ts-icon-button:hover {
   border-color:
-    #1ab3ff !important;
+    var(--ptt-accent) !important;
 
   background:
     #174763 !important;
 
   box-shadow:
-    0 0 8px
-    rgba(24,170,255,0.25);
+    0 0 9px
+    var(--ptt-glow) !important;
 }
 
 
@@ -2074,7 +2331,7 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   KANALENLIJST - EXTRA BREED
+   BREDE KANALENLIJST
    ========================================================== */
 
 .ts-tree-panel {
@@ -2093,7 +2350,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    #155078 !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     11px !important;
@@ -2115,7 +2372,7 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   SERVER RIJ LINKS
+   SERVER RIJ
    ========================================================== */
 
 .ts-server-row {
@@ -2140,12 +2397,12 @@ ptt_css = r'''
 
   border:
     1px solid
-    #164e73 !important;
+    var(--ptt-accent-soft) !important;
 }
 
 
 /* ==========================================================
-   ZOEKEN
+   ZOEKVELD
    ========================================================== */
 
 .ts-tree-search {
@@ -2175,9 +2432,17 @@ ptt_css = r'''
     #ffffff !important;
 }
 
+.ts-tree-search:focus {
+  border-color:
+    var(--ptt-accent) !important;
+
+  outline:
+    none;
+}
+
 
 /* ==========================================================
-   CHANNELS / GEBRUIKERS
+   CHANNELS EN GEBRUIKERS
    ========================================================== */
 
 .ts-row {
@@ -2200,17 +2465,17 @@ ptt_css = r'''
   background:
     linear-gradient(
       90deg,
-      #0d4265,
-      #103650
+      var(--ptt-accent-dark),
+      #102c3e
     ) !important;
 
   outline:
     1px solid
-    #168ed0 !important;
+    var(--ptt-accent) !important;
 
   box-shadow:
     inset 3px 0 0
-    #1ab2ff;
+    var(--ptt-accent) !important;
 }
 
 .ts-channel-row {
@@ -2228,7 +2493,7 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   PRAATBOLLEN
+   PRAATINDICATOR
    ========================================================== */
 
 .ts-talk-lamp-idle {
@@ -2263,7 +2528,7 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   MIDDENPANEEL
+   RECHTER PANEEL
    ========================================================== */
 
 .ts-side-panel {
@@ -2282,19 +2547,37 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   BANNER
+   TEAMSpeak 3 ACHTIGE BANNER
    ========================================================== */
 
 .ts-banner-panel {
   min-height:
-    230px !important;
+    0 !important;
+
+  height:
+    150px !important;
+
+  max-height:
+    150px !important;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    6px !important;
 
   margin:
     0 !important;
 
   border:
     1px solid
-    #15527b !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     11px !important;
@@ -2303,7 +2586,7 @@ ptt_css = r'''
     hidden;
 
   background:
-    #071522 !important;
+    #06121c !important;
 
   box-shadow:
     0 5px 18px
@@ -2311,19 +2594,46 @@ ptt_css = r'''
 }
 
 .ts-server-banner {
+  display:
+    block;
+
   width:
-    100%;
+    100% !important;
 
   height:
-    100%;
+    100% !important;
+
+  max-width:
+    100% !important;
+
+  max-height:
+    138px !important;
 
   object-fit:
-    cover;
+    contain !important;
+
+  object-position:
+    center center !important;
+}
+
+@media (max-height: 800px) {
+  .ts-banner-panel {
+    height:
+      120px !important;
+
+    max-height:
+      120px !important;
+  }
+
+  .ts-server-banner {
+    max-height:
+      108px !important;
+  }
 }
 
 
 /* ==========================================================
-   INFO
+   INFO PANEEL
    ========================================================== */
 
 .ts-info-panel {
@@ -2339,7 +2649,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    #144b70 !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     11px !important;
@@ -2396,7 +2706,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    #15527a !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     11px !important;
@@ -2424,7 +2734,7 @@ ptt_css = r'''
 
 .ts-chat-from {
   color:
-    #35b7ff !important;
+    var(--ptt-accent) !important;
 
   font-weight:
     700;
@@ -2460,7 +2770,10 @@ ptt_css = r'''
     #123b58 !important;
 
   color:
-    #4fc5ff !important;
+    var(--ptt-accent) !important;
+
+  border-color:
+    var(--ptt-accent-soft) !important;
 }
 
 
@@ -2506,10 +2819,14 @@ ptt_css = r'''
 
 .ts-chat-input-row textarea:focus {
   border-color:
-    #1ab3ff !important;
+    var(--ptt-accent) !important;
 
   outline:
     none !important;
+
+  box-shadow:
+    0 0 0 2px
+    var(--ptt-glow) !important;
 }
 
 .ts-chat-input-row button {
@@ -2521,13 +2838,13 @@ ptt_css = r'''
 
   border:
     1px solid
-    #1599dc !important;
+    var(--ptt-accent) !important;
 
   background:
     linear-gradient(
       180deg,
-      #159fe7,
-      #0875ad
+      var(--ptt-accent),
+      var(--ptt-accent-dark)
     ) !important;
 
   color:
@@ -2539,7 +2856,125 @@ ptt_css = r'''
 
 
 /* ==========================================================
-   AUDIO PLAYER
+   THEMA MENU
+   ========================================================== */
+
+.ptt-theme-quick {
+  position:
+    relative;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+}
+
+.ptt-theme-menu {
+  position:
+    absolute !important;
+
+  top:
+    calc(100% + 5px);
+
+  right:
+    0;
+
+  left:
+    auto !important;
+
+  min-width:
+    220px;
+
+  z-index:
+    10020;
+
+  padding:
+    7px !important;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft) !important;
+
+  border-radius:
+    10px !important;
+
+  background:
+    #081b2a !important;
+
+  box-shadow:
+    0 12px 32px
+    rgba(0,0,0,0.60) !important;
+}
+
+.ptt-theme-menu-title {
+  padding:
+    7px 10px 9px;
+
+  margin-bottom:
+    4px;
+
+  border-bottom:
+    1px solid
+    rgba(255,255,255,0.10);
+
+  font-weight:
+    700;
+
+  color:
+    var(--ptt-accent);
+}
+
+.ptt-theme-swatch {
+  width:
+    16px;
+
+  height:
+    16px;
+
+  border-radius:
+    50%;
+
+  margin-right:
+    8px;
+
+  border:
+    1px solid
+    rgba(255,255,255,0.55);
+
+  box-shadow:
+    0 0 5px
+    rgba(0,0,0,0.45);
+
+  flex-shrink:
+    0;
+}
+
+.ptt-theme-menu-active {
+  background:
+    rgba(255,255,255,0.08) !important;
+
+  font-weight:
+    700;
+}
+
+.ptt-theme-check {
+  margin-left:
+    auto;
+
+  padding-left:
+    10px;
+
+  color:
+    var(--ptt-accent);
+
+  font-weight:
+    800;
+}
+
+
+/* ==========================================================
+   AUDIO PLAYER SNELMENU
    ========================================================== */
 
 .ptt-stream-quick {
@@ -2577,7 +3012,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    #1671a6 !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     10px !important;
@@ -2598,16 +3033,16 @@ ptt_css = r'''
     700;
 
   color:
-    #55c8ff;
+    var(--ptt-accent);
 }
 
 .ptt-stream-active {
   border-color:
-    #00c8ff !important;
+    var(--ptt-accent) !important;
 
   box-shadow:
     0 0 10px
-    rgba(0,190,255,0.45) !important;
+    var(--ptt-glow) !important;
 }
 
 .ptt-stream-status {
@@ -2624,7 +3059,7 @@ ptt_css = r'''
     700;
 
   color:
-    #46c8ff;
+    var(--ptt-accent);
 }
 
 
@@ -2641,7 +3076,7 @@ ptt_css = r'''
 
   border:
     1px solid
-    #1675aa !important;
+    var(--ptt-accent-soft) !important;
 
   border-radius:
     12px !important;
@@ -2694,7 +3129,11 @@ ptt_css = r'''
 
 .ptt-audio-player-row-active {
   border-color:
-    #00bfff !important;
+    var(--ptt-accent) !important;
+
+  box-shadow:
+    0 0 10px
+    var(--ptt-glow) !important;
 }
 
 .ptt-audio-player-info {
@@ -2787,7 +3226,7 @@ ptt_css = r'''
 
 .ts-resize-handle-vertical:hover {
   background:
-    #168ac4 !important;
+    var(--ptt-accent) !important;
 }
 
 .ts-resize-handle-horizontal {
@@ -2797,7 +3236,7 @@ ptt_css = r'''
 
 .ts-resize-handle-horizontal:hover {
   background:
-    #168ac4 !important;
+    var(--ptt-accent) !important;
 }
 
 
@@ -2820,7 +3259,7 @@ ptt_css = r'''
 
 .ts-app ::-webkit-scrollbar-thumb {
   background:
-    #174663;
+    var(--ptt-accent-soft);
 
   border:
     2px solid
@@ -2832,7 +3271,7 @@ ptt_css = r'''
 
 .ts-app ::-webkit-scrollbar-thumb:hover {
   background:
-    #1d6b94;
+    var(--ptt-accent);
 }
 
 
@@ -2846,7 +3285,7 @@ ptt_css = r'''
 
   border-top:
     1px solid
-    #103a56 !important;
+    var(--ptt-accent-soft) !important;
 
   color:
     #8da9bc !important;
@@ -2887,7 +3326,7 @@ ptt_css = r'''
 '''
 
 
-if "PTT CONNECT MODERN BLUE LOOK" not in css:
+if "PTT CONNECT MODERN LOOK" not in css:
     css += ptt_css
 
 
@@ -2934,6 +3373,10 @@ print(
 )
 
 print(
+    "- streams starten nooit automatisch"
+)
+
+print(
     "- snelknop naast zonnetje"
 )
 
@@ -2942,9 +3385,25 @@ print(
 )
 
 print(
-    "- nieuwe blauwe PTT Connect look"
+    "- brede kanalenlijst behouden"
 )
 
 print(
-    "- kanalenlijst 440 px breed"
+    "- 6 kleurthema's toegevoegd"
+)
+
+print(
+    "- blauw groen rood paars oranje roze"
+)
+
+print(
+    "- kleurkeuze wordt opgeslagen"
+)
+
+print(
+    "- kleinere TeamSpeak 3 banner"
+)
+
+print(
+    "- banner volledig passend in beeld"
 )
