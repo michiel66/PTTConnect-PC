@@ -145,6 +145,181 @@ voice = replace_once(
 )
 
 
+# ============================================================
+# DIRECTE TEAMSpeak ONTVANGSTAUDIO
+#
+# Alleen de LUISTER-kant.
+# Microfoon/PTT wordt hier NIET gewijzigd.
+#
+# Als ontvangen audio te ver vooruit wordt ingepland,
+# gooien we de achterstallige playback weg en gaan
+# we terug naar bijna-live.
+# ============================================================
+
+voice = replace_once(
+    voice,
+    '''export class AudioPlayer {
+  private nextTime = 0;
+''',
+    '''export class AudioPlayer {
+  private nextTime = 0;
+
+  private scheduledSources =
+    new Set<AudioBufferSourceNode>();
+''',
+    "AudioPlayer scheduled sources"
+)
+
+
+voice = replace_once(
+    voice,
+    '''  playFrame(base64Pcm: string): void {
+''',
+    '''  private clearScheduledAudio(): void {
+    for (
+      const source of
+      this.scheduledSources
+    ) {
+      try {
+        source.stop();
+      } catch {
+        // Source kan al afgelopen zijn.
+      }
+
+      try {
+        source.disconnect();
+      } catch {
+        // Geen probleem als hij al los is.
+      }
+    }
+
+    this.scheduledSources.clear();
+  }
+
+  playFrame(base64Pcm: string): void {
+''',
+    "AudioPlayer clear scheduled audio"
+)
+
+
+voice = replace_once(
+    voice,
+    '''    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gain);
+
+    const now = this.context.currentTime;
+    if (this.nextTime < now + 0.02) {
+      // First frame, or we fell behind - restart just ahead of now instead of
+      // letting a backlog build up.
+      this.nextTime = now + 0.02;
+    }
+    source.start(this.nextTime);
+    this.nextTime += frames / SAMPLE_RATE;
+''',
+    '''    const now =
+      this.context.currentTime;
+
+    const minimumLead =
+      0.02;
+
+    const maximumLead =
+      0.12;
+
+    // Eerste audioframe of playback is
+    // achter het huidige tijdstip geraakt.
+    if (
+      this.nextTime <
+      now + minimumLead
+    ) {
+      this.nextTime =
+        now + minimumLead;
+    }
+
+    // Als de wachtrij groter wordt dan
+    // 120 ms, blijven we niet oude audio
+    // afspelen. Spring terug naar live.
+    if (
+      this.nextTime >
+      now + maximumLead
+    ) {
+      this.clearScheduledAudio();
+
+      this.nextTime =
+        now + minimumLead;
+    }
+
+    const source =
+      this.context.createBufferSource();
+
+    source.buffer =
+      buffer;
+
+    source.connect(
+      this.gain
+    );
+
+    this.scheduledSources.add(
+      source
+    );
+
+    source.onended = () => {
+      this.scheduledSources.delete(
+        source
+      );
+
+      try {
+        source.disconnect();
+      } catch {
+        // Al losgekoppeld.
+      }
+    };
+
+    source.start(
+      this.nextTime
+    );
+
+    this.nextTime +=
+      frames / SAMPLE_RATE;
+''',
+    "direct TeamSpeak receive audio"
+)
+
+
+voice = replace_once(
+    voice,
+    '''  reset(): void {
+    this.nextTime = 0;
+  }
+''',
+    '''  reset(): void {
+    this.clearScheduledAudio();
+
+    this.nextTime = 0;
+  }
+''',
+    "AudioPlayer reset"
+)
+
+
+voice = replace_once(
+    voice,
+    '''  dispose(): void {
+    this.detachAecRenderTap();
+    this.element.pause();
+''',
+    '''  dispose(): void {
+    this.clearScheduledAudio();
+
+    this.nextTime = 0;
+
+    this.detachAecRenderTap();
+    this.element.pause();
+''',
+    "AudioPlayer dispose"
+)
+
+
 VOICE_FILE.write_text(
     voice,
     encoding="utf-8"
@@ -341,10 +516,8 @@ function makePttConnectNickname(
     return "";
   }
 
-  // TeamSpeak nicknames hebben een
-  // beperkte lengte. Houd ruimte vrij
-  // voor " PTT Connect".
-  const maxNicknameLength = 30;
+  const maxNicknameLength =
+    30;
 
   const maxBaseLength =
     Math.max(
@@ -408,7 +581,6 @@ app = replace_once(
 
 # ============================================================
 # AUTOMATISCH "PTT Connect" ACHTER DE NAAM
-# Dit werkt voor normaal verbinden EN bookmarks.
 # ============================================================
 
 app = replace_once(
@@ -427,7 +599,6 @@ app = replace_once(
 
 # ============================================================
 # BLAUWE SERVERBOLLEN -> RODE BOLLEN
-# Ook als 🔵 onderdeel van de servernaam is.
 # ============================================================
 
 app = replace_once(
@@ -575,7 +746,6 @@ app = replace_once(
 
 # ============================================================
 # HOTKEY SCHERM
-# GEBRUIKER DRUKT ZELF OP GEWENSTE TOETS
 # ============================================================
 
 hotkey_panel = '''function HotkeysPanel({
@@ -1077,7 +1247,7 @@ APP_FILE.write_text(
 
 # ============================================================
 # APP.CSS
-# PTT CONNECT RODE BOLLEN + NETTERE UITLIJNING
+# RODE BOLLEN + NETTERE UITLIJNING
 # ============================================================
 
 css = CSS_FILE.read_text(
@@ -1103,7 +1273,6 @@ ptt_css = r'''
   box-sizing: border-box;
 }
 
-/* Hoofdscherm rustiger en rechter uitlijnen */
 .ts-upper {
   align-items: stretch;
 }
@@ -1128,7 +1297,7 @@ ptt_css = r'''
   min-height: 180px;
 }
 
-/* Blauwe idle praatbol wordt PTT Connect rood */
+/* Idle gebruiker = rood */
 .ts-talk-lamp-idle {
   background:
     radial-gradient(
@@ -1147,8 +1316,7 @@ ptt_css = r'''
       rgba(0, 0, 0, 0.30) !important;
 }
 
-/* Pratende gebruiker blijft groen zodat direct
-   zichtbaar blijft wie daadwerkelijk spreekt. */
+/* Pratende gebruiker blijft groen */
 .ts-talk-lamp-talking {
   box-shadow:
     inset 0 1px 1px
@@ -1161,7 +1329,6 @@ ptt_css = r'''
       rgba(0, 0, 0, 0.2);
 }
 
-/* Serverregel en gebruikerregels gelijk uitlijnen */
 .ts-server-row,
 .ts-client-row,
 .ts-channel-row {
@@ -1169,12 +1336,10 @@ ptt_css = r'''
   align-items: center;
 }
 
-/* Iets meer ruimte in de serverboom */
 .ts-tree-list-root {
   padding-top: 0.2rem;
 }
 
-/* Informatieblok netjes op één lijn houden */
 .ts-info-title {
   align-items: center;
 }
@@ -1183,7 +1348,6 @@ ptt_css = r'''
   align-items: baseline;
 }
 
-/* Bij groot Windows-scherm iets ruimere rechterkant */
 @media (min-width: 1300px) {
   .ts-tree-panel {
     min-width: 320px;
@@ -1245,4 +1409,16 @@ print(
 
 print(
     "- desktop layout netjes uitgelijnd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio blijft dicht bij live"
+)
+
+print(
+    "- te grote luisterbuffer wordt automatisch weggegooid"
+)
+
+print(
+    "- microfoon/PTT zendkant niet gewijzigd"
 )
