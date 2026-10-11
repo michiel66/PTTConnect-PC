@@ -3407,3 +3407,1125 @@ print(
 print(
     "- banner volledig passend in beeld"
 )
+# ============================================================
+# PTT CONNECT - KANAAL DASHBOARD IN LEGE RUIMTE
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# DASHBOARD COMPONENT
+# ============================================================
+
+ptt_dashboard_component = r'''
+function PttChannelDashboard({
+  channel,
+  clients,
+  totalClientCount,
+  totalChannelCount,
+}: {
+  channel: ChannelInfo;
+  clients: ClientInfo[];
+  totalClientCount: number;
+  totalChannelCount: number;
+}) {
+  const channelClients =
+    clients.filter(
+      (client) =>
+        client.channel === channel.id
+    );
+
+  return (
+    <div className="ptt-channel-dashboard">
+
+      <div className="ptt-dashboard-brand">
+        <div className="ptt-dashboard-radio">
+          <span className="ptt-dashboard-wave">
+            ))) 
+          </span>
+
+          <span className="ptt-dashboard-tower">
+            📡
+          </span>
+
+          <span className="ptt-dashboard-wave">
+            (((
+          </span>
+        </div>
+
+        <div className="ptt-dashboard-brand-text">
+          <strong>
+            PTT CONNECT
+          </strong>
+
+          <span>
+            PRAAT • LUISTER • VERBIND
+          </span>
+        </div>
+      </div>
+
+
+      <div className="ptt-dashboard-grid">
+
+        <section className="ptt-dashboard-card">
+          <div className="ptt-dashboard-title">
+            ℹ️ Kanaal info
+          </div>
+
+          <div className="ptt-dashboard-channel-name">
+            {channel.name}
+          </div>
+
+          {channel.topic && (
+            <div className="ptt-dashboard-description">
+              {channel.topic}
+            </div>
+          )}
+
+          <div className="ptt-dashboard-stats">
+            <div>
+              <span>
+                Type
+              </span>
+
+              <strong>
+                🔊 Spraakkanaal
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Codec
+              </span>
+
+              <strong>
+                {channel.codec}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Wachtwoord
+              </span>
+
+              <strong>
+                {channel.hasPassword
+                  ? "Ja"
+                  : "Nee"}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Gebruikers
+              </span>
+
+              <strong>
+                {channelClients.length}
+                {" / "}
+                {channel.maxClients ?? "∞"}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+
+        <section className="ptt-dashboard-card">
+          <div className="ptt-dashboard-title">
+            👥 Nu actief ({channelClients.length})
+          </div>
+
+          <div className="ptt-active-users">
+            {channelClients.length === 0 ? (
+              <div className="ptt-dashboard-empty">
+                Niemand in dit kanaal
+              </div>
+            ) : (
+              channelClients
+                .slice(0, 8)
+                .map(
+                  (client) => (
+                    <div
+                      key={client.id}
+                      className="ptt-active-user"
+                    >
+                      <span
+                        className={
+                          "ptt-active-user-dot" +
+                          (
+                            client.inputMuted ||
+                            !client.inputHardwareEnabled
+                              ? " ptt-active-user-muted"
+                              : ""
+                          )
+                        }
+                      />
+
+                      <div className="ptt-active-user-info">
+                        <strong>
+                          {client.name}
+                        </strong>
+
+                        <span>
+                          {client.inputMuted ||
+                          !client.inputHardwareEnabled
+                            ? "Microfoon gedempt"
+                            : "Verbonden"}
+                        </span>
+                      </div>
+
+                      <span className="ptt-active-user-signal">
+                        ▂▄▆
+                      </span>
+                    </div>
+                  )
+                )
+            )}
+
+            {channelClients.length > 8 && (
+              <div className="ptt-dashboard-more">
+                + {channelClients.length - 8}
+                {" meer"}
+              </div>
+            )}
+          </div>
+        </section>
+
+
+        <section className="ptt-dashboard-card">
+          <div className="ptt-dashboard-title">
+            📊 Server status
+          </div>
+
+          <div className="ptt-dashboard-server-online">
+            <span className="ptt-online-dot" />
+
+            Online
+          </div>
+
+          <div className="ptt-dashboard-stats">
+            <div>
+              <span>
+                Clients totaal
+              </span>
+
+              <strong>
+                {totalClientCount}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Kanalen
+              </span>
+
+              <strong>
+                {totalChannelCount}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Huidig kanaal
+              </span>
+
+              <strong>
+                {channelClients.length}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Audio
+              </span>
+
+              <strong>
+                {channel.codec}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+
+        <section className="ptt-dashboard-card ptt-dashboard-help">
+          <div className="ptt-dashboard-title">
+            🎙️ PTT Connect
+          </div>
+
+          <div className="ptt-dashboard-big-status">
+            <span>
+              ●
+            </span>
+
+            Klaar voor communicatie
+          </div>
+
+          <p>
+            Kies je kanaal links en gebruik
+            jouw ingestelde Push-To-Talk toets
+            om te spreken.
+          </p>
+
+          <div className="ptt-dashboard-mini-features">
+            <span>
+              🎙 PTT
+            </span>
+
+            <span>
+              📻 Streams
+            </span>
+
+            <span>
+              🎨 Thema
+            </span>
+          </div>
+        </section>
+
+      </div>
+
+
+      <div className="ptt-dashboard-tips">
+        <div className="ptt-dashboard-title">
+          💡 PTT Connect tips
+        </div>
+
+        <div className="ptt-dashboard-tip-grid">
+          <span>
+            • Houd je PTT-toets ingedrukt terwijl je spreekt.
+          </span>
+
+          <span>
+            • Luister eerst voordat je begint met praten.
+          </span>
+
+          <span>
+            • Gebruik een headset voor de beste audio.
+          </span>
+
+          <span>
+            • Kies bovenaan je favoriete kleurthema.
+          </span>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+'''
+
+
+app = replace_once(
+    app,
+    '''function InfoPanel({
+''',
+    ptt_dashboard_component +
+    '''function InfoPanel({
+''',
+    "PTT Connect channel dashboard component"
+)
+
+
+# ============================================================
+# DASHBOARD ONDER KANAALINFORMATIE TONEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      <div className="ts-info-row">
+        <span>{t("info.clients")}</span> <span>{clientCount} / {channel.maxClients ?? "∞"}</span>
+      </div>
+    </div>
+  );
+}
+''',
+    '''      <div className="ts-info-row">
+        <span>{t("info.clients")}</span> <span>{clientCount} / {channel.maxClients ?? "∞"}</span>
+      </div>
+
+      <PttChannelDashboard
+        channel={channel}
+        clients={clients}
+        totalClientCount={totalClientCount}
+        totalChannelCount={totalChannelCount}
+      />
+    </div>
+  );
+}
+''',
+    "show PTT Connect dashboard in empty channel space"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# DASHBOARD CSS
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+dashboard_css = r'''
+
+/* ==========================================================
+   PTT CONNECT KANAAL DASHBOARD
+   ========================================================== */
+
+.ts-side-panel {
+  overflow:
+    auto;
+}
+
+
+.ptt-channel-dashboard {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    10px;
+
+  margin-top:
+    16px;
+
+  padding-top:
+    14px;
+
+  border-top:
+    1px solid
+    var(--ptt-accent-soft);
+}
+
+
+/* ==========================================================
+   PTT CONNECT LOGO / HEADER
+   ========================================================== */
+
+.ptt-dashboard-brand {
+  min-height:
+    92px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    18px;
+
+  padding:
+    14px 20px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    12px;
+
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(
+        in srgb,
+        var(--ptt-accent) 12%,
+        #081724
+      ),
+      #06131f 70%
+    );
+
+  box-shadow:
+    inset 0 0 30px
+    rgba(0,0,0,0.25);
+}
+
+
+.ptt-dashboard-radio {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    5px;
+
+  color:
+    var(--ptt-accent);
+}
+
+
+.ptt-dashboard-tower {
+  font-size:
+    34px;
+
+  filter:
+    drop-shadow(
+      0 0 8px
+      var(--ptt-glow)
+    );
+}
+
+
+.ptt-dashboard-wave {
+  font-size:
+    18px;
+
+  font-weight:
+    800;
+
+  color:
+    var(--ptt-accent);
+}
+
+
+.ptt-dashboard-brand-text {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  line-height:
+    1.1;
+}
+
+
+.ptt-dashboard-brand-text strong {
+  font-size:
+    24px;
+
+  letter-spacing:
+    1px;
+
+  color:
+    var(--ptt-accent);
+
+  text-shadow:
+    0 0 12px
+    var(--ptt-glow);
+}
+
+
+.ptt-dashboard-brand-text span {
+  margin-top:
+    5px;
+
+  font-size:
+    10px;
+
+  letter-spacing:
+    1.4px;
+
+  color:
+    #a7c1d3;
+}
+
+
+/* ==========================================================
+   DASHBOARD GRID
+   ========================================================== */
+
+.ptt-dashboard-grid {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap:
+    10px;
+}
+
+
+.ptt-dashboard-card {
+  min-width:
+    0;
+
+  padding:
+    13px 14px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    11px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(15,42,62,0.96),
+      rgba(6,20,31,0.96)
+    );
+
+  box-shadow:
+    0 4px 14px
+    rgba(0,0,0,0.22);
+}
+
+
+.ptt-dashboard-title {
+  margin-bottom:
+    10px;
+
+  padding-bottom:
+    7px;
+
+  border-bottom:
+    1px solid
+    rgba(255,255,255,0.10);
+
+  font-size:
+    14px;
+
+  font-weight:
+    800;
+
+  color:
+    var(--ptt-accent);
+}
+
+
+/* ==========================================================
+   KANAAL INFO
+   ========================================================== */
+
+.ptt-dashboard-channel-name {
+  margin-bottom:
+    6px;
+
+  font-size:
+    16px;
+
+  font-weight:
+    800;
+
+  color:
+    #f1f8fc;
+}
+
+
+.ptt-dashboard-description {
+  margin-bottom:
+    12px;
+
+  color:
+    #9fb8ca;
+
+  font-size:
+    12px;
+
+  line-height:
+    1.45;
+}
+
+
+.ptt-dashboard-stats {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+}
+
+
+.ptt-dashboard-stats > div {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    12px;
+
+  min-height:
+    23px;
+
+  padding:
+    3px 0;
+
+  border-bottom:
+    1px solid
+    rgba(255,255,255,0.055);
+}
+
+
+.ptt-dashboard-stats > div:last-child {
+  border-bottom:
+    none;
+}
+
+
+.ptt-dashboard-stats span {
+  color:
+    #8faabd;
+
+  font-size:
+    12px;
+}
+
+
+.ptt-dashboard-stats strong {
+  max-width:
+    60%;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+
+  color:
+    #eaf5fc;
+
+  font-size:
+    12px;
+
+  text-align:
+    right;
+}
+
+
+/* ==========================================================
+   ACTIEVE GEBRUIKERS
+   ========================================================== */
+
+.ptt-active-users {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    4px;
+}
+
+
+.ptt-active-user {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+
+  min-height:
+    39px;
+
+  padding:
+    5px 7px;
+
+  border-radius:
+    8px;
+}
+
+
+.ptt-active-user:hover {
+  background:
+    rgba(255,255,255,0.045);
+}
+
+
+.ptt-active-user-dot {
+  width:
+    12px;
+
+  height:
+    12px;
+
+  flex:
+    0 0 auto;
+
+  border-radius:
+    50%;
+
+  background:
+    #2bdd6f;
+
+  box-shadow:
+    0 0 8px
+    rgba(43,221,111,0.55);
+}
+
+
+.ptt-active-user-muted {
+  background:
+    #ef7d45;
+
+  box-shadow:
+    0 0 7px
+    rgba(239,125,69,0.45);
+}
+
+
+.ptt-active-user-info {
+  flex:
+    1;
+
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+}
+
+
+.ptt-active-user-info strong {
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+
+  color:
+    #edf7fd;
+
+  font-size:
+    12px;
+}
+
+
+.ptt-active-user-info span {
+  margin-top:
+    2px;
+
+  color:
+    #7f9caf;
+
+  font-size:
+    10px;
+}
+
+
+.ptt-active-user-signal {
+  color:
+    var(--ptt-accent);
+
+  font-size:
+    13px;
+
+  letter-spacing:
+    -2px;
+}
+
+
+.ptt-dashboard-empty,
+.ptt-dashboard-more {
+  padding:
+    10px;
+
+  text-align:
+    center;
+
+  color:
+    #7e9bae;
+
+  font-size:
+    11px;
+}
+
+
+/* ==========================================================
+   SERVER STATUS
+   ========================================================== */
+
+.ptt-dashboard-server-online {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+
+  margin-bottom:
+    9px;
+
+  padding:
+    5px 9px;
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(30,180,90,0.12);
+
+  color:
+    #61e68c;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+}
+
+
+.ptt-online-dot {
+  width:
+    9px;
+
+  height:
+    9px;
+
+  border-radius:
+    50%;
+
+  background:
+    #34dc70;
+
+  box-shadow:
+    0 0 8px
+    rgba(52,220,112,0.75);
+}
+
+
+/* ==========================================================
+   PTT STATUS
+   ========================================================== */
+
+.ptt-dashboard-big-status {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+
+  margin-bottom:
+    9px;
+
+  color:
+    #5ae788;
+
+  font-weight:
+    800;
+}
+
+
+.ptt-dashboard-big-status span {
+  color:
+    #32dc72;
+
+  text-shadow:
+    0 0 8px
+    rgba(50,220,114,0.75);
+}
+
+
+.ptt-dashboard-help p {
+  margin:
+    0 0 12px;
+
+  color:
+    #9eb6c7;
+
+  font-size:
+    12px;
+
+  line-height:
+    1.45;
+}
+
+
+.ptt-dashboard-mini-features {
+  display:
+    flex;
+
+  flex-wrap:
+    wrap;
+
+  gap:
+    6px;
+}
+
+
+.ptt-dashboard-mini-features span {
+  padding:
+    5px 8px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    7px;
+
+  background:
+    rgba(255,255,255,0.035);
+
+  color:
+    #dceaf3;
+
+  font-size:
+    10px;
+}
+
+
+/* ==========================================================
+   TIPS ONDERAAN
+   ========================================================== */
+
+.ptt-dashboard-tips {
+  padding:
+    11px 14px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    11px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(15,42,62,0.92),
+      rgba(6,20,31,0.95)
+    );
+}
+
+
+.ptt-dashboard-tips .ptt-dashboard-title {
+  margin-bottom:
+    7px;
+}
+
+
+.ptt-dashboard-tip-grid {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap:
+    4px 20px;
+
+  color:
+    #9eb7c8;
+
+  font-size:
+    10px;
+
+  line-height:
+    1.35;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 1250px) {
+
+  .ptt-dashboard-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .ptt-dashboard-tip-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .ptt-dashboard-brand {
+    min-height:
+      75px;
+  }
+
+
+  .ptt-dashboard-brand-text strong {
+    font-size:
+      19px;
+  }
+
+}
+
+'''
+
+
+if "PTT CONNECT KANAAL DASHBOARD" not in css:
+    css += dashboard_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- PTT Connect dashboard toegevoegd"
+)
+
+print(
+    "- lege ruimte rechts wordt benut"
+)
+
+print(
+    "- kanaalinformatie toegevoegd"
+)
+
+print(
+    "- gebruikers in huidig kanaal toegevoegd"
+)
+
+print(
+    "- serverstatus toegevoegd"
+)
+
+print(
+    "- PTT Connect tips toegevoegd"
+)
+
+print(
+    "- bestaande PTT en audio niet gewijzigd"
+)
