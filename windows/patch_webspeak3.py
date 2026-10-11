@@ -4993,3 +4993,130 @@ print(
 print(
     "- PTT microfoon en audio niet gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - SPREKER KLEUR VAN GROEN NAAR BLAUW/CYAAN
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+speaker_color_override_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - BLAUWE SPREKER HIGHLIGHT
+   ========================================================== */
+
+.ptt-active-user-talking {
+  position:
+    relative;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(40, 190, 255, 0.24),
+      rgba(10, 70, 120, 0.14)
+    ) !important;
+
+  border:
+    1px solid
+    rgba(80, 220, 255, 0.78) !important;
+
+  box-shadow:
+    0 0 13px
+    rgba(60, 210, 255, 0.22),
+    inset 3px 0 0
+    #56dfff !important;
+
+  transform:
+    translateX(2px);
+}
+
+
+/* blauwe praatbol */
+
+.ptt-active-user-dot-talking {
+  background:
+    #59dcff !important;
+
+  box-shadow:
+    0 0 5px
+    #59dcff,
+    0 0 12px
+    rgba(89,220,255,0.82) !important;
+
+  animation:
+    pttSpeakerDotPulse
+    0.75s
+    ease-in-out
+    infinite alternate;
+}
+
+
+/* SPREEKT NU tekst blauw */
+
+.ptt-speaking-now-text {
+  color:
+    #74e6ff !important;
+
+  font-weight:
+    800 !important;
+
+  letter-spacing:
+    0.4px;
+
+  text-shadow:
+    0 0 7px
+    rgba(116,230,255,0.38) !important;
+}
+
+
+/* signaalbalkjes rechts blauw */
+
+.ptt-active-user-signal-talking {
+  color:
+    #63e2ff !important;
+
+  font-size:
+    15px !important;
+
+  text-shadow:
+    0 0 8px
+    rgba(99,226,255,0.68) !important;
+
+  animation:
+    pttSpeakerBars
+    0.40s
+    ease-in-out
+    infinite alternate;
+}
+
+'''
+
+
+if "PTT CONNECT - BLAUWE SPREKER HIGHLIGHT" not in css:
+    css += speaker_color_override_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- spreker highlight veranderd van groen naar blauw/cyaan"
+)
+
+print(
+    "- SPREEKT NU kleur aangepast"
+)
+
+print(
+    "- praatbol aangepast"
+)
+
+print(
+    "- signaalbalkjes aangepast"
+)
