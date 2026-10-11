@@ -5120,3 +5120,935 @@ print(
 print(
     "- signaalbalkjes aangepast"
 )
+# ============================================================
+# PTT CONNECT - EIGEN KLEUR + PRESETS
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# OPSLAG VOOR EIGEN KLEUREN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''const PTT_COLOR_THEME_KEY =
+  "pttconnect:color-theme";
+''',
+    '''const PTT_COLOR_THEME_KEY =
+  "pttconnect:color-theme";
+
+const PTT_CUSTOM_COLOR_KEY =
+  "pttconnect:custom-color";
+
+const PTT_CUSTOM_COLOR_ACTIVE_KEY =
+  "pttconnect:custom-color-active";
+
+const PTT_CUSTOM_PRESETS_KEY =
+  "pttconnect:custom-color-presets";
+''',
+    "custom color storage keys"
+)
+
+
+# ============================================================
+# PRESET TYPE + LADEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''const PTT_AUDIO_STREAMS = [
+''',
+    '''interface PttCustomColorPreset {
+  id: string;
+  name: string;
+  color: string;
+}
+
+function loadPttCustomColor(): string {
+  const saved =
+    localStorage.getItem(
+      PTT_CUSTOM_COLOR_KEY
+    );
+
+  if (
+    saved &&
+    /^#[0-9a-fA-F]{6}$/.test(saved)
+  ) {
+    return saved;
+  }
+
+  return "#18aaff";
+}
+
+function loadPttCustomColorActive(): boolean {
+  return (
+    localStorage.getItem(
+      PTT_CUSTOM_COLOR_ACTIVE_KEY
+    ) === "1"
+  );
+}
+
+function loadPttCustomPresets():
+  PttCustomColorPreset[] {
+  try {
+    const raw =
+      localStorage.getItem(
+        PTT_CUSTOM_PRESETS_KEY
+      );
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter(
+        (item) =>
+          item &&
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          typeof item.color === "string" &&
+          /^#[0-9a-fA-F]{6}$/.test(
+            item.color
+          )
+      )
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+const PTT_AUDIO_STREAMS = [
+''',
+    "custom color preset loaders"
+)
+
+
+# ============================================================
+# STATE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+''',
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+
+  const [
+    pttCustomColor,
+    setPttCustomColor
+  ] = useState(
+    loadPttCustomColor
+  );
+
+  const [
+    pttCustomColorActive,
+    setPttCustomColorActive
+  ] = useState(
+    loadPttCustomColorActive
+  );
+
+  const [
+    pttCustomPresets,
+    setPttCustomPresets
+  ] = useState<PttCustomColorPreset[]>(
+    loadPttCustomPresets
+  );
+''',
+    "custom color state"
+)
+
+
+# ============================================================
+# EIGEN KLEUR OPSLAAN EN TOEPASSEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const stopPttAudioStream = () => {
+''',
+    '''  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--ptt-custom-accent",
+      pttCustomColor
+    );
+
+    localStorage.setItem(
+      PTT_CUSTOM_COLOR_KEY,
+      pttCustomColor
+    );
+  }, [
+    pttCustomColor
+  ]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      PTT_CUSTOM_COLOR_ACTIVE_KEY,
+      pttCustomColorActive
+        ? "1"
+        : "0"
+    );
+  }, [
+    pttCustomColorActive
+  ]);
+
+  const savePttCustomPreset = () => {
+    const enteredName =
+      window.prompt(
+        "Naam voor deze kleur:",
+        "Mijn kleur"
+      );
+
+    const name =
+      enteredName?.trim();
+
+    if (!name) {
+      return;
+    }
+
+    const preset:
+      PttCustomColorPreset = {
+        id:
+          String(Date.now()),
+
+        name:
+          name.slice(0, 30),
+
+        color:
+          pttCustomColor,
+      };
+
+    const next =
+      [
+        ...pttCustomPresets,
+        preset
+      ].slice(-12);
+
+    setPttCustomPresets(
+      next
+    );
+
+    localStorage.setItem(
+      PTT_CUSTOM_PRESETS_KEY,
+      JSON.stringify(next)
+    );
+
+    setPttCustomColorActive(
+      true
+    );
+  };
+
+  const deletePttCustomPreset = (
+    id: string
+  ) => {
+    const next =
+      pttCustomPresets.filter(
+        (preset) =>
+          preset.id !== id
+      );
+
+    setPttCustomPresets(
+      next
+    );
+
+    localStorage.setItem(
+      PTT_CUSTOM_PRESETS_KEY,
+      JSON.stringify(next)
+    );
+  };
+
+  const stopPttAudioStream = () => {
+''',
+    "custom color handlers"
+)
+
+
+# ============================================================
+# CUSTOM CLASS OP APP
+# ============================================================
+
+app = replace_once(
+    app,
+    '''}${novaSplash ? " ts-nova-splash" : ""} ts-ptt-color-${pttColorTheme}`}
+''',
+    '''}${novaSplash ? " ts-nova-splash" : ""} ts-ptt-color-${pttColorTheme}${
+        pttCustomColorActive
+          ? " ptt-custom-color"
+          : ""
+      }`}
+''',
+    "custom color app class"
+)
+
+
+# ============================================================
+# VASTE KLEUR UITSCHAKELEN ALS EIGEN KLEUR ACTIEF IS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                    const active =
+                      pttColorTheme ===
+                      colorTheme.id;
+''',
+    '''                    const active =
+                      !pttCustomColorActive &&
+                      pttColorTheme ===
+                      colorTheme.id;
+''',
+    "fixed theme active state"
+)
+
+
+# ============================================================
+# BIJ VASTE KLEUR EIGEN KLEUR UITSCHAKELEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                          setPttColorTheme(
+                            colorTheme.id
+                          );
+
+                          localStorage.setItem(
+''',
+    '''                          setPttColorTheme(
+                            colorTheme.id
+                          );
+
+                          setPttCustomColorActive(
+                            false
+                          );
+
+                          localStorage.setItem(
+''',
+    "disable custom color when fixed theme selected"
+)
+
+
+# ============================================================
+# EIGEN KLEUR MENU TOEVOEGEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                )}
+
+                <div className="ts-menu-separator" />
+
+                <button
+                  type="button"
+                  className="ts-menu-item"
+                  onClick={() => {
+                    setTheme(
+''',
+    '''                )}
+
+                <div className="ts-menu-separator" />
+
+                <div className="ptt-custom-color-section">
+
+                  <div className="ptt-custom-color-title">
+                    🎨 Eigen kleur
+                  </div>
+
+                  <div className="ptt-custom-color-picker-row">
+
+                    <input
+                      type="color"
+                      className="ptt-custom-color-picker"
+                      value={pttCustomColor}
+                      onChange={(event) => {
+                        const color =
+                          event.target.value;
+
+                        setPttCustomColor(
+                          color
+                        );
+
+                        setPttCustomColorActive(
+                          true
+                        );
+                      }}
+                      title="Kies eigen kleur"
+                    />
+
+                    <button
+                      type="button"
+                      className={
+                        "ptt-custom-color-use" +
+                        (
+                          pttCustomColorActive
+                            ? " ptt-custom-color-use-active"
+                            : ""
+                        )
+                      }
+                      onClick={() =>
+                        setPttCustomColorActive(
+                          true
+                        )
+                      }
+                    >
+                      <span
+                        className="ptt-custom-color-preview"
+                        style={{
+                          background:
+                            pttCustomColor
+                        }}
+                      />
+
+                      {pttCustomColorActive
+                        ? "Eigen kleur actief"
+                        : "Gebruik eigen kleur"}
+                    </button>
+
+                  </div>
+
+
+                  <button
+                    type="button"
+                    className="ptt-custom-save-button"
+                    onClick={
+                      savePttCustomPreset
+                    }
+                  >
+                    ＋ Opslaan als preset
+                  </button>
+
+
+                  {pttCustomPresets.length > 0 && (
+                    <div className="ptt-custom-presets">
+
+                      <div className="ptt-custom-presets-title">
+                        Mijn presets
+                      </div>
+
+                      {pttCustomPresets.map(
+                        (preset) => (
+                          <div
+                            key={preset.id}
+                            className="ptt-custom-preset-row"
+                          >
+
+                            <button
+                              type="button"
+                              className="ptt-custom-preset-select"
+                              onClick={() => {
+                                setPttCustomColor(
+                                  preset.color
+                                );
+
+                                setPttCustomColorActive(
+                                  true
+                                );
+                              }}
+                            >
+                              <span
+                                className="ptt-theme-swatch"
+                                style={{
+                                  background:
+                                    preset.color
+                                }}
+                              />
+
+                              <span>
+                                {preset.name}
+                              </span>
+                            </button>
+
+
+                            <button
+                              type="button"
+                              className="ptt-custom-preset-delete"
+                              title="Preset verwijderen"
+                              onClick={() =>
+                                deletePttCustomPreset(
+                                  preset.id
+                                )
+                              }
+                            >
+                              ✕
+                            </button>
+
+                          </div>
+                        )
+                      )}
+
+                    </div>
+                  )}
+
+                </div>
+
+
+                <div className="ts-menu-separator" />
+
+                <button
+                  type="button"
+                  className="ts-menu-item"
+                  onClick={() => {
+                    setTheme(
+''',
+    "custom color theme menu"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS EIGEN KLEUR
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+custom_color_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - EIGEN KLEUR
+   ========================================================== */
+
+.ts-app.ptt-custom-color {
+  --ptt-accent:
+    var(
+      --ptt-custom-accent,
+      #18aaff
+    );
+
+  --ptt-accent-soft:
+    color-mix(
+      in srgb,
+      var(
+        --ptt-custom-accent,
+        #18aaff
+      ) 55%,
+      #071421
+    );
+
+  --ptt-accent-dark:
+    color-mix(
+      in srgb,
+      var(
+        --ptt-custom-accent,
+        #18aaff
+      ) 36%,
+      #03101a
+    );
+
+  --ptt-glow:
+    color-mix(
+      in srgb,
+      var(
+        --ptt-custom-accent,
+        #18aaff
+      ) 38%,
+      transparent
+    );
+}
+
+
+/* ==========================================================
+   THEMA MENU IETS BREDER
+   ========================================================== */
+
+.ptt-theme-menu {
+  min-width:
+    270px !important;
+
+  max-height:
+    calc(100vh - 120px);
+
+  overflow-y:
+    auto;
+}
+
+
+/* ==========================================================
+   EIGEN KLEUR GEDEELTE
+   ========================================================== */
+
+.ptt-custom-color-section {
+  padding:
+    6px 8px 8px;
+}
+
+
+.ptt-custom-color-title {
+  margin-bottom:
+    7px;
+
+  color:
+    var(--ptt-accent);
+
+  font-size:
+    12px;
+
+  font-weight:
+    800;
+}
+
+
+.ptt-custom-color-picker-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+}
+
+
+.ptt-custom-color-picker {
+  width:
+    42px;
+
+  height:
+    34px;
+
+  padding:
+    2px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    7px;
+
+  background:
+    #071521;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-custom-color-use {
+  flex:
+    1;
+
+  min-height:
+    34px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+
+  padding:
+    5px 8px;
+
+  border:
+    1px solid
+    #21445a;
+
+  border-radius:
+    7px;
+
+  background:
+    #0b1e2c;
+
+  color:
+    #dceaf3;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-custom-color-use:hover {
+  border-color:
+    var(--ptt-accent);
+}
+
+
+.ptt-custom-color-use-active {
+  border-color:
+    var(--ptt-accent);
+
+  box-shadow:
+    0 0 8px
+    var(--ptt-glow);
+}
+
+
+.ptt-custom-color-preview {
+  width:
+    15px;
+
+  height:
+    15px;
+
+  flex:
+    0 0 auto;
+
+  border-radius:
+    50%;
+
+  border:
+    1px solid
+    rgba(255,255,255,0.65);
+}
+
+
+/* ==========================================================
+   OPSLAAN
+   ========================================================== */
+
+.ptt-custom-save-button {
+  width:
+    100%;
+
+  margin-top:
+    7px;
+
+  padding:
+    7px 9px;
+
+  border:
+    1px solid
+    var(--ptt-accent-soft);
+
+  border-radius:
+    7px;
+
+  background:
+    rgba(255,255,255,0.035);
+
+  color:
+    #dceaf3;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-custom-save-button:hover {
+  border-color:
+    var(--ptt-accent);
+
+  color:
+    #ffffff;
+}
+
+
+/* ==========================================================
+   PRESETS
+   ========================================================== */
+
+.ptt-custom-presets {
+  margin-top:
+    9px;
+
+  padding-top:
+    7px;
+
+  border-top:
+    1px solid
+    rgba(255,255,255,0.08);
+}
+
+
+.ptt-custom-presets-title {
+  margin-bottom:
+    5px;
+
+  color:
+    #809caf;
+
+  font-size:
+    10px;
+
+  font-weight:
+    700;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    0.6px;
+}
+
+
+.ptt-custom-preset-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    4px;
+
+  margin:
+    2px 0;
+}
+
+
+.ptt-custom-preset-select {
+  flex:
+    1;
+
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    2px;
+
+  padding:
+    6px 7px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    6px;
+
+  background:
+    transparent;
+
+  color:
+    #dceaf3;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-custom-preset-select:hover {
+  border-color:
+    var(--ptt-accent-soft);
+
+  background:
+    rgba(255,255,255,0.045);
+}
+
+
+.ptt-custom-preset-select > span:last-child {
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.ptt-custom-preset-delete {
+  width:
+    28px;
+
+  height:
+    28px;
+
+  padding:
+    0;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    6px;
+
+  background:
+    transparent;
+
+  color:
+    #7995a7;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-custom-preset-delete:hover {
+  border-color:
+    #a4424c;
+
+  background:
+    rgba(190,50,65,0.14);
+
+  color:
+    #ff7b86;
+}
+
+'''
+
+
+if "PTT CONNECT - EIGEN KLEUR" not in css:
+    css += custom_color_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- eigen kleurkiezer toegevoegd"
+)
+
+print(
+    "- gekozen eigen kleur wordt onthouden"
+)
+
+print(
+    "- eigen kleuren kunnen als preset worden opgeslagen"
+)
+
+print(
+    "- maximaal 12 eigen presets"
+)
+
+print(
+    "- presets kunnen verwijderd worden"
+)
+
+print(
+    "- vaste kleuren blijven bestaan"
+)
+
+print(
+    "- PTT microfoon TeamSpeak audio en streams niet gewijzigd"
+)
