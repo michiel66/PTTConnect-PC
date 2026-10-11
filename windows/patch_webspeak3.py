@@ -4529,3 +4529,467 @@ print(
 print(
     "- bestaande PTT en audio niet gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - LIVE SPREKER BIJ "NU ACTIEF"
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# TALKERS DOORGEVEN AAN DASHBOARD
+# ============================================================
+
+app = replace_once(
+    app,
+    '''function PttChannelDashboard({
+  channel,
+  clients,
+  totalClientCount,
+  totalChannelCount,
+}: {
+  channel: ChannelInfo;
+  clients: ClientInfo[];
+  totalClientCount: number;
+  totalChannelCount: number;
+}) {
+  const channelClients =
+    clients.filter(
+      (client) =>
+        client.channel === channel.id
+    );
+''',
+    '''function PttChannelDashboard({
+  channel,
+  clients,
+  totalClientCount,
+  totalChannelCount,
+  talkers,
+}: {
+  channel: ChannelInfo;
+  clients: ClientInfo[];
+  totalClientCount: number;
+  totalChannelCount: number;
+  talkers: Set<number>;
+}) {
+  const channelClients =
+    clients
+      .filter(
+        (client) =>
+          client.channel === channel.id
+      )
+      .sort(
+        (a, b) => {
+          const aTalking =
+            talkers.has(a.id)
+              ? 1
+              : 0;
+
+          const bTalking =
+            talkers.has(b.id)
+              ? 1
+              : 0;
+
+          return (
+            bTalking -
+            aTalking
+          );
+        }
+      );
+''',
+    "dashboard live talkers"
+)
+
+
+# ============================================================
+# ACTIEVE GEBRUIKER LATEN OPLICHTEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                    <div
+                      key={client.id}
+                      className="ptt-active-user"
+                    >
+                      <span
+                        className={
+                          "ptt-active-user-dot" +
+                          (
+                            client.inputMuted ||
+                            !client.inputHardwareEnabled
+                              ? " ptt-active-user-muted"
+                              : ""
+                          )
+                        }
+                      />
+
+                      <div className="ptt-active-user-info">
+                        <strong>
+                          {client.name}
+                        </strong>
+
+                        <span>
+                          {client.inputMuted ||
+                          !client.inputHardwareEnabled
+                            ? "Microfoon gedempt"
+                            : "Verbonden"}
+                        </span>
+                      </div>
+
+                      <span className="ptt-active-user-signal">
+                        ▂▄▆
+                      </span>
+                    </div>
+''',
+    '''                    <div
+                      key={client.id}
+                      className={
+                        "ptt-active-user" +
+                        (
+                          talkers.has(client.id)
+                            ? " ptt-active-user-talking"
+                            : ""
+                        )
+                      }
+                    >
+                      <span
+                        className={
+                          "ptt-active-user-dot" +
+                          (
+                            talkers.has(client.id)
+                              ? " ptt-active-user-dot-talking"
+                              : client.inputMuted ||
+                                !client.inputHardwareEnabled
+                                ? " ptt-active-user-muted"
+                                : ""
+                          )
+                        }
+                      />
+
+                      <div className="ptt-active-user-info">
+                        <strong>
+                          {client.name}
+                        </strong>
+
+                        <span
+                          className={
+                            talkers.has(client.id)
+                              ? "ptt-speaking-now-text"
+                              : ""
+                          }
+                        >
+                          {talkers.has(client.id)
+                            ? "🎙 SPREEKT NU"
+                            : client.inputMuted ||
+                              !client.inputHardwareEnabled
+                              ? "Microfoon gedempt"
+                              : "Verbonden"}
+                        </span>
+                      </div>
+
+                      <span
+                        className={
+                          "ptt-active-user-signal" +
+                          (
+                            talkers.has(client.id)
+                              ? " ptt-active-user-signal-talking"
+                              : ""
+                          )
+                        }
+                      >
+                        ▂▄▆
+                      </span>
+                    </div>
+''',
+    "live speaker highlight"
+)
+
+
+# ============================================================
+# TALKERS PROP BIJ DASHBOARD
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      <PttChannelDashboard
+        channel={channel}
+        clients={clients}
+        totalClientCount={totalClientCount}
+        totalChannelCount={totalChannelCount}
+      />
+''',
+    '''      <PttChannelDashboard
+        channel={channel}
+        clients={clients}
+        totalClientCount={totalClientCount}
+        totalChannelCount={totalChannelCount}
+        talkers={talkers}
+      />
+''',
+    "dashboard talkers prop"
+)
+
+
+# ============================================================
+# INFOPANEL TALKERS ARGUMENT
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  serverGroups,
+  images,
+  onShowServerConnectionInfo,
+''',
+    '''  serverGroups,
+  images,
+  talkers,
+  onShowServerConnectionInfo,
+''',
+    "InfoPanel talkers argument"
+)
+
+
+app = replace_once(
+    app,
+    '''  serverGroups: GroupEntry[] | null;
+  images: Record<string, string>;
+  onShowServerConnectionInfo: () => void;
+''',
+    '''  serverGroups: GroupEntry[] | null;
+  images: Record<string, string>;
+  talkers: Set<number>;
+  onShowServerConnectionInfo: () => void;
+''',
+    "InfoPanel talkers type"
+)
+
+
+# ============================================================
+# LIVE TALKERS VAN APP NAAR INFOPANEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                serverGroups={serverGroups}
+                images={serverIconImages}
+                onShowServerConnectionInfo={handleShowServerConnectionInfo}
+''',
+    '''                serverGroups={serverGroups}
+                images={serverIconImages}
+                talkers={displayTalkers}
+                onShowServerConnectionInfo={handleShowServerConnectionInfo}
+''',
+    "pass live talkers to InfoPanel"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# LIVE SPREKER CSS
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+live_speaker_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - LIVE SPREKER BIJ NU ACTIEF
+   ========================================================== */
+
+.ptt-active-user {
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+/* ==========================================================
+   DEGENE DIE PRAAT
+   ========================================================== */
+
+.ptt-active-user-talking {
+  position:
+    relative;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(24, 155, 82, 0.28),
+      rgba(10, 70, 45, 0.16)
+    ) !important;
+
+  border:
+    1px solid
+    rgba(56, 235, 118, 0.75);
+
+  box-shadow:
+    0 0 13px
+    rgba(45, 230, 110, 0.28),
+    inset 3px 0 0
+    #39ed78;
+
+  transform:
+    translateX(2px);
+}
+
+
+/* groene praatbol */
+
+.ptt-active-user-dot-talking {
+  background:
+    #35ef78 !important;
+
+  box-shadow:
+    0 0 5px
+    #35ef78,
+    0 0 12px
+    rgba(53,239,120,0.85) !important;
+
+  animation:
+    pttSpeakerDotPulse
+    0.75s
+    ease-in-out
+    infinite alternate;
+}
+
+
+/* ==========================================================
+   SPREEKT NU TEKST
+   ========================================================== */
+
+.ptt-speaking-now-text {
+  color:
+    #52f18b !important;
+
+  font-weight:
+    800 !important;
+
+  letter-spacing:
+    0.4px;
+
+  text-shadow:
+    0 0 7px
+    rgba(75,245,135,0.42);
+}
+
+
+/* ==========================================================
+   SIGNAAL BALKJES
+   ========================================================== */
+
+.ptt-active-user-signal-talking {
+  color:
+    #4df087 !important;
+
+  font-size:
+    15px !important;
+
+  text-shadow:
+    0 0 8px
+    rgba(77,240,135,0.75);
+
+  animation:
+    pttSpeakerBars
+    0.40s
+    ease-in-out
+    infinite alternate;
+}
+
+
+/* ==========================================================
+   ANIMATIES
+   ========================================================== */
+
+@keyframes pttSpeakerDotPulse {
+
+  from {
+    transform:
+      scale(0.90);
+
+    opacity:
+      0.78;
+  }
+
+  to {
+    transform:
+      scale(1.18);
+
+    opacity:
+      1;
+  }
+
+}
+
+
+@keyframes pttSpeakerBars {
+
+  from {
+    transform:
+      scaleY(0.72);
+
+    opacity:
+      0.65;
+  }
+
+  to {
+    transform:
+      scaleY(1.20);
+
+    opacity:
+      1;
+  }
+
+}
+
+'''
+
+
+if "PTT CONNECT - LIVE SPREKER BIJ NU ACTIEF" not in css:
+    css += live_speaker_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- live spreker bij Nu actief toegevoegd"
+)
+
+print(
+    "- huidige spreker komt automatisch bovenaan"
+)
+
+print(
+    "- naam krijgt SPREEKT NU"
+)
+
+print(
+    "- groene praatindicator toegevoegd"
+)
+
+print(
+    "- bewegende signaalindicator toegevoegd"
+)
+
+print(
+    "- wisselt automatisch zodra iemand anders praat"
+)
+
+print(
+    "- PTT microfoon en audio niet gewijzigd"
+)
