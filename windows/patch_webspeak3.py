@@ -6577,6 +6577,93 @@ print(
 print(
     "- lichte kleuren krijgen donkere tekst waar nodig"
 )
+# ============================================================
+# FIX - SLIM CONTRAST STATE VOLGORDE
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+app = replace_once(
+    app,
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+
+  const pttCustomColorIsLight =
+    isLightPttColor(
+      pttCustomColor
+    );
+
+  const [
+    pttCustomColor,
+    setPttCustomColor
+  ] = useState(
+    loadPttCustomColor
+  );
+
+  const [
+    pttCustomColorActive,
+    setPttCustomColorActive
+  ] = useState(
+    loadPttCustomColorActive
+  );
+
+  const [
+    pttCustomPresets,
+    setPttCustomPresets
+  ] = useState<PttCustomColorPreset[]>(
+    loadPttCustomPresets
+  );
+''',
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+
+  const [
+    pttCustomColor,
+    setPttCustomColor
+  ] = useState(
+    loadPttCustomColor
+  );
+
+  const [
+    pttCustomColorActive,
+    setPttCustomColorActive
+  ] = useState(
+    loadPttCustomColorActive
+  );
+
+  const [
+    pttCustomPresets,
+    setPttCustomPresets
+  ] = useState<PttCustomColorPreset[]>(
+    loadPttCustomPresets
+  );
+
+  const pttCustomColorIsLight =
+    isLightPttColor(
+      pttCustomColor
+    );
+''',
+    "fix smart contrast state order"
+)
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+print(
+    "- slimme kleurcontrast state-volgorde hersteld"
+)
+
+print(
+    "- PTT audio microfoon streams en icoon niet gewijzigd"
+)
 
 print(
     "- PTT audio streams en microfoon niet gewijzigd"
