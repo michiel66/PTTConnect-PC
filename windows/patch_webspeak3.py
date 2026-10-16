@@ -9201,3 +9201,855 @@ print(
 print(
     "- webcamfunctie NIET verwijderd"
 )
+# ============================================================
+# PTT CONNECT - VIDEO GALERIJ PRO
+# Fullscreen + vergroten + sprekerhighlight + betere layout
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# TALKER STATUS NAAR VIDEO TEGEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''function PttVideoGalleryTile({
+  info,
+  clientName,
+  send,
+  iceServers,
+}: {
+  info: StreamInfo;
+  clientName: string;
+  send: (
+    message:
+      Record<string, unknown>
+  ) => void;
+  iceServers:
+    RTCIceServer[];
+}) {
+''',
+    '''function PttVideoGalleryTile({
+  info,
+  clientName,
+  send,
+  iceServers,
+  isTalking,
+}: {
+  info: StreamInfo;
+  clientName: string;
+  send: (
+    message:
+      Record<string, unknown>
+  ) => void;
+  iceServers:
+    RTCIceServer[];
+  isTalking:
+    boolean;
+}) {
+
+  const tileRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+''',
+    "video tile talking prop and ref"
+)
+
+
+# ============================================================
+# FULLSCREEN FUNCTIE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const connected =
+    connectionState ===
+      "connected";
+
+
+  return (
+''',
+    '''  const connected =
+    connectionState ===
+      "connected";
+
+
+  const toggleVideoFullscreen =
+    async () => {
+
+      const tile =
+        tileRef.current;
+
+      if (!tile) {
+        return;
+      }
+
+      try {
+
+        if (
+          document.fullscreenElement ===
+          tile
+        ) {
+
+          await document.exitFullscreen();
+
+        } else {
+
+          await tile.requestFullscreen();
+
+        }
+
+      } catch {
+        /*
+         * Fullscreen kan door Windows/browser
+         * geweigerd worden. De videostream
+         * blijft dan gewoon doorlopen.
+         */
+      }
+    };
+
+
+  return (
+''',
+    "video tile fullscreen handler"
+)
+
+
+# ============================================================
+# TEGEL: FULLSCREEN + SPREKER CLASS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''    <div
+      className={
+        "ptt-video-tile" +
+        (
+          connected
+            ? " ptt-video-tile-connected"
+            : ""
+        )
+      }
+    >
+''',
+    '''    <div
+      ref={
+        tileRef
+      }
+      className={
+        "ptt-video-tile" +
+        (
+          connected
+            ? " ptt-video-tile-connected"
+            : ""
+        ) +
+        (
+          isTalking
+            ? " ptt-video-tile-talking"
+            : ""
+        )
+      }
+      onDoubleClick={
+        () => {
+          void toggleVideoFullscreen();
+        }
+      }
+      title="Dubbelklik voor volledig scherm"
+    >
+''',
+    "video tile fullscreen and talking class"
+)
+
+
+# ============================================================
+# VERGROOTKNOP RECHTSBOVEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      <div className="ptt-video-tile-video">
+
+        <video
+''',
+    '''      <div className="ptt-video-tile-video">
+
+        <button
+          type="button"
+          className="ptt-video-fullscreen-button"
+          onClick={
+            (
+              event
+            ) => {
+              event.stopPropagation();
+
+              void toggleVideoFullscreen();
+            }
+          }
+          title="Video vergroten"
+          aria-label="Video vergroten"
+        >
+          ⛶
+        </button>
+
+
+        {isTalking && (
+          <div className="ptt-video-speaking-badge">
+            🎙 SPREEKT NU
+          </div>
+        )}
+
+
+        <video
+''',
+    "video fullscreen button"
+)
+
+
+# ============================================================
+# LIVE TEKST AANPASSEN ALS IEMAND PRAAT
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          {connected && (
+            <span className="ptt-video-live-text">
+              LIVE
+            </span>
+          )}
+''',
+    '''          {connected && (
+            <span
+              className={
+                "ptt-video-live-text" +
+                (
+                  isTalking
+                    ? " ptt-video-live-talking"
+                    : ""
+                )
+              }
+            >
+              {
+                isTalking
+                  ? "PTT"
+                  : "LIVE"
+              }
+            </span>
+          )}
+''',
+    "video live talking text"
+)
+
+
+# ============================================================
+# TALKER STATUS VAN APP NAAR TEGEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                        iceServers={
+                          [
+                            ...DEFAULT_ICE_SERVERS,
+                            ...turnServers
+                          ]
+                        }
+                      />
+''',
+    '''                        iceServers={
+                          [
+                            ...DEFAULT_ICE_SERVERS,
+                            ...turnServers
+                          ]
+                        }
+
+                        isTalking={
+                          displayTalkers.has(
+                            info.clientId
+                          )
+                        }
+                      />
+''',
+    "pass talker state to video tile"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS VIDEO GALERIJ PRO
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+video_pro_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - VIDEO GALERIJ PRO
+   ========================================================== */
+
+
+/* ==========================================================
+   ACTIEVE PTT SPREKER
+   ========================================================== */
+
+.ptt-video-tile-talking {
+  border-color:
+    rgba(
+      83,
+      224,
+      255,
+      0.95
+    ) !important;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(
+      70,
+      215,
+      255,
+      0.20
+    ),
+    0 0 24px
+    rgba(
+      65,
+      210,
+      255,
+      0.46
+    ),
+    inset 0 0 16px
+    rgba(
+      50,
+      190,
+      255,
+      0.08
+    ) !important;
+
+  transform:
+    translateY(-1px);
+}
+
+
+/* ==========================================================
+   SPREEKT NU BADGE
+   ========================================================== */
+
+.ptt-video-speaking-badge {
+  position:
+    absolute;
+
+  z-index:
+    6;
+
+  top:
+    10px;
+
+  left:
+    10px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    5px;
+
+  padding:
+    6px 9px;
+
+  border:
+    1px solid
+    rgba(
+      95,
+      229,
+      255,
+      0.75
+    );
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(
+      5,
+      33,
+      49,
+      0.90
+    );
+
+  color:
+    #79eaff;
+
+  font-size:
+    10px;
+
+  font-weight:
+    800;
+
+  letter-spacing:
+    0.05em;
+
+  box-shadow:
+    0 0 12px
+    rgba(
+      75,
+      220,
+      255,
+      0.34
+    );
+
+  animation:
+    pttVideoSpeakerPulse
+    0.75s
+    ease-in-out
+    infinite alternate;
+}
+
+
+@keyframes pttVideoSpeakerPulse {
+
+  from {
+    opacity:
+      0.82;
+  }
+
+  to {
+    opacity:
+      1;
+
+    box-shadow:
+      0 0 18px
+      rgba(
+        75,
+        220,
+        255,
+        0.60
+      );
+  }
+
+}
+
+
+/* ==========================================================
+   VERGROOT / FULLSCREEN KNOP
+   ========================================================== */
+
+.ptt-video-fullscreen-button {
+  position:
+    absolute;
+
+  z-index:
+    8;
+
+  top:
+    9px;
+
+  right:
+    9px;
+
+  width:
+    34px;
+
+  height:
+    34px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.18
+    );
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(
+      0,
+      8,
+      15,
+      0.78
+    );
+
+  color:
+    #eaf9ff;
+
+  font-size:
+    19px;
+
+  cursor:
+    pointer;
+
+  opacity:
+    0.72;
+
+  transition:
+    opacity 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.ptt-video-tile:hover
+.ptt-video-fullscreen-button {
+  opacity:
+    1;
+}
+
+
+.ptt-video-fullscreen-button:hover {
+  border-color:
+    #59dcff;
+
+  background:
+    rgba(
+      30,
+      150,
+      215,
+      0.34
+    );
+
+  transform:
+    scale(1.06);
+}
+
+
+/* ==========================================================
+   LIVE / PTT INDICATOR
+   ========================================================== */
+
+.ptt-video-live-talking {
+  color:
+    #78eaff !important;
+
+  text-shadow:
+    0 0 7px
+    rgba(
+      80,
+      220,
+      255,
+      0.75
+    );
+}
+
+
+/* ==========================================================
+   FULLSCREEN VIDEO
+   ========================================================== */
+
+.ptt-video-tile:fullscreen {
+  width:
+    100vw;
+
+  height:
+    100vh;
+
+  max-width:
+    none;
+
+  max-height:
+    none;
+
+  border:
+    0;
+
+  border-radius:
+    0;
+
+  background:
+    #000;
+}
+
+
+.ptt-video-tile:fullscreen
+.ptt-video-tile-video {
+  width:
+    100%;
+
+  height:
+    100%;
+
+  aspect-ratio:
+    auto;
+
+  background:
+    #000;
+}
+
+
+.ptt-video-tile:fullscreen video {
+  width:
+    100%;
+
+  height:
+    100%;
+
+  object-fit:
+    contain;
+
+  background:
+    #000;
+}
+
+
+.ptt-video-tile:fullscreen
+.ptt-video-name {
+  left:
+    20px;
+
+  right:
+    auto;
+
+  bottom:
+    20px;
+
+  min-width:
+    220px;
+
+  padding:
+    10px 14px;
+
+  font-size:
+    14px;
+}
+
+
+.ptt-video-tile:fullscreen
+.ptt-video-fullscreen-button {
+  top:
+    18px;
+
+  right:
+    18px;
+
+  width:
+    42px;
+
+  height:
+    42px;
+
+  font-size:
+    23px;
+
+  opacity:
+    1;
+}
+
+
+.ptt-video-tile:fullscreen
+.ptt-video-speaking-badge {
+  top:
+    20px;
+
+  left:
+    20px;
+
+  padding:
+    8px 12px;
+
+  font-size:
+    12px;
+}
+
+
+/* ==========================================================
+   AUTOMATISCHE GRID VERBETERING
+   ========================================================== */
+
+.ptt-video-grid-many {
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(
+        250px,
+        1fr
+      )
+    );
+}
+
+
+/* 1 gebruiker = mooi groot */
+
+.ptt-video-grid-1
+.ptt-video-tile {
+  max-width:
+    1000px;
+
+  width:
+    100%;
+
+  justify-self:
+    center;
+}
+
+
+/* 2 gebruikers */
+
+.ptt-video-grid-2 {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        280px,
+        1fr
+      )
+    );
+}
+
+
+/* 3 en 4 gebruikers = 2 x 2 */
+
+.ptt-video-grid-4 {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        260px,
+        1fr
+      )
+    );
+}
+
+
+/* 5 en 6 gebruikers = 3 kolommen */
+
+.ptt-video-grid-6 {
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        220px,
+        1fr
+      )
+    );
+}
+
+
+/* ==========================================================
+   MOBIEL / KLEIN VENSTER
+   ========================================================== */
+
+@media (
+  max-width:
+    1050px
+) {
+
+  .ptt-video-grid-6,
+  .ptt-video-grid-many {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          220px,
+          1fr
+        )
+      );
+  }
+
+}
+
+
+@media (
+  max-width:
+    700px
+) {
+
+  .ptt-video-grid-1,
+  .ptt-video-grid-2,
+  .ptt-video-grid-4,
+  .ptt-video-grid-6,
+  .ptt-video-grid-many {
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+'''
+
+
+if (
+    "PTT CONNECT - VIDEO GALERIJ PRO"
+    not in css
+):
+    css += (
+        video_pro_css
+    )
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- videogalerij Pro toegevoegd"
+)
+
+print(
+    "- dubbelklik opent fullscreen"
+)
+
+print(
+    "- vergrootknop rechtsboven toegevoegd"
+)
+
+print(
+    "- ESC sluit fullscreen via Windows/browser"
+)
+
+print(
+    "- actieve PTT spreker krijgt blauwe rand"
+)
+
+print(
+    "- SPREEKT NU verschijnt op videobeeld"
+)
+
+print(
+    "- gebruikersnaam blijft zichtbaar"
+)
+
+print(
+    "- 2x2 en 3x3 galerij automatisch verbeterd"
+)
+
+print(
+    "- Push-To-Talk audio NIET gewijzigd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio NIET gewijzigd"
+)
+
+print(
+    "- webcam en schermdelen NIET gewijzigd"
+)
