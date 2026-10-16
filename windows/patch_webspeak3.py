@@ -10049,6 +10049,584 @@ print(
 print(
     "- TeamSpeak ontvangstaudio NIET gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - VIDEO GALERIJ BEDIENING
+# Inklappen/openen + gebruiker vastpinnen
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# GALERIJ STATUS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [
+    pttVideoSource,
+    setPttVideoSource
+  ] = useState<
+    "camera" |
+    "screen" |
+    null
+  >(null);
+''',
+    '''  const [
+    pttVideoSource,
+    setPttVideoSource
+  ] = useState<
+    "camera" |
+    "screen" |
+    null
+  >(null);
+
+  const [
+    pttVideoGalleryCollapsed,
+    setPttVideoGalleryCollapsed
+  ] = useState(
+    false
+  );
+
+  const [
+    pttPinnedVideoClientId,
+    setPttPinnedVideoClientId
+  ] = useState<number | null>(
+    null
+  );
+''',
+    "video gallery controls state"
+)
+
+
+# ============================================================
+# PIN PROPS NAAR VIDEO TEGEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  iceServers,
+  isTalking,
+}: {
+''',
+    '''  iceServers,
+  isTalking,
+  isPinned,
+  onTogglePin,
+}: {
+''',
+    "video tile pin props args"
+)
+
+
+app = replace_once(
+    app,
+    '''  isTalking:
+    boolean;
+}) {
+''',
+    '''  isTalking:
+    boolean;
+  isPinned:
+    boolean;
+  onTogglePin:
+    () => void;
+}) {
+''',
+    "video tile pin props type"
+)
+
+
+# ============================================================
+# PIN KNOP OP VIDEO TEGEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''        <button
+          type="button"
+          className="ptt-video-fullscreen-button"
+''',
+    '''        <button
+          type="button"
+          className={
+            "ptt-video-pin-button" +
+            (
+              isPinned
+                ? " ptt-video-pin-active"
+                : ""
+            )
+          }
+          onClick={
+            (
+              event
+            ) => {
+              event.stopPropagation();
+
+              onTogglePin();
+            }
+          }
+          title={
+            isPinned
+              ? "Video losmaken"
+              : "Video vastzetten"
+          }
+          aria-label={
+            isPinned
+              ? "Video losmaken"
+              : "Video vastzetten"
+          }
+        >
+          📌
+        </button>
+
+
+        <button
+          type="button"
+          className="ptt-video-fullscreen-button"
+''',
+    "video tile pin button"
+)
+
+
+# ============================================================
+# GALERIJ COLLAPSED CLASS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          <section className="ptt-video-gallery">
+''',
+    '''          <section
+            className={
+              "ptt-video-gallery" +
+              (
+                pttVideoGalleryCollapsed
+                  ? " ptt-video-gallery-collapsed"
+                  : ""
+              )
+            }
+          >
+''',
+    "video gallery collapsed class"
+)
+
+
+# ============================================================
+# HEADER KNOPPEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''              <div className="ptt-video-gallery-status">
+
+                <span className="ptt-video-gallery-online-dot" />
+
+                {
+                  channelStreams.length
+                }
+
+                {
+                  channelStreams.length ===
+                  1
+                    ? " video"
+                    : " video's"
+                }
+
+              </div>
+''',
+    '''              <div className="ptt-video-gallery-actions">
+
+                <div className="ptt-video-gallery-status">
+
+                  <span className="ptt-video-gallery-online-dot" />
+
+                  {
+                    channelStreams.length
+                  }
+
+                  {
+                    channelStreams.length ===
+                    1
+                      ? " video"
+                      : " video's"
+                  }
+
+                </div>
+
+
+                <button
+                  type="button"
+                  className="ptt-video-gallery-control"
+                  onClick={
+                    () => {
+                      setPttVideoGalleryCollapsed(
+                        (
+                          current
+                        ) =>
+                          !current
+                      );
+                    }
+                  }
+                  title={
+                    pttVideoGalleryCollapsed
+                      ? "Videogalerij openen"
+                      : "Videogalerij inklappen"
+                  }
+                >
+                  {
+                    pttVideoGalleryCollapsed
+                      ? "▴"
+                      : "▾"
+                  }
+                </button>
+
+              </div>
+''',
+    "video gallery header controls"
+)
+
+
+# ============================================================
+# VASTGEPINDE VIDEO ALTIJD EERST
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                channelStreams.map(
+                  (
+                    info
+                  ) => {
+''',
+    '''                [
+                  ...channelStreams
+                ]
+                  .sort(
+                    (
+                      a,
+                      b
+                    ) => {
+
+                      if (
+                        a.clientId ===
+                        pttPinnedVideoClientId
+                      ) {
+                        return -1;
+                      }
+
+                      if (
+                        b.clientId ===
+                        pttPinnedVideoClientId
+                      ) {
+                        return 1;
+                      }
+
+                      return 0;
+                    }
+                  )
+                  .map(
+                  (
+                    info
+                  ) => {
+''',
+    "pinned video first"
+)
+
+
+# ============================================================
+# PIN STATUS NAAR TEGEL
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                        isTalking={
+                          displayTalkers.has(
+                            info.clientId
+                          )
+                        }
+                      />
+''',
+    '''                        isTalking={
+                          displayTalkers.has(
+                            info.clientId
+                          )
+                        }
+
+                        isPinned={
+                          pttPinnedVideoClientId ===
+                          info.clientId
+                        }
+
+                        onTogglePin={
+                          () => {
+                            setPttPinnedVideoClientId(
+                              (
+                                current
+                              ) =>
+                                current === info.clientId
+                                  ? null
+                                  : info.clientId
+                            );
+                          }
+                        }
+                      />
+''',
+    "video tile pin state"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+video_controls_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - VIDEO GALERIJ BEDIENING
+   ========================================================== */
+
+.ptt-video-gallery-actions {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+}
+
+
+.ptt-video-gallery-control {
+  width:
+    34px;
+
+  height:
+    34px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid
+    rgba(90, 215, 255, 0.28);
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(30, 150, 215, 0.10);
+
+  color:
+    #9deaff;
+
+  cursor:
+    pointer;
+
+  font-size:
+    16px;
+}
+
+
+.ptt-video-gallery-control:hover {
+  border-color:
+    #59dcff;
+
+  background:
+    rgba(40, 180, 245, 0.20);
+}
+
+
+/* ==========================================================
+   INGEKLAPTE GALERIJ
+   ========================================================== */
+
+.ptt-video-gallery-collapsed {
+  max-height:
+    64px;
+}
+
+
+.ptt-video-gallery-collapsed
+.ptt-video-grid,
+
+.ptt-video-gallery-collapsed
+.ptt-video-gallery-footer {
+  display:
+    none !important;
+}
+
+
+/* ==========================================================
+   PIN KNOP
+   ========================================================== */
+
+.ptt-video-pin-button {
+  position:
+    absolute;
+
+  z-index:
+    8;
+
+  top:
+    9px;
+
+  right:
+    51px;
+
+  width:
+    34px;
+
+  height:
+    34px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.18);
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(0, 8, 15, 0.78);
+
+  color:
+    #eaf9ff;
+
+  cursor:
+    pointer;
+
+  opacity:
+    0.72;
+}
+
+
+.ptt-video-tile:hover
+.ptt-video-pin-button {
+  opacity:
+    1;
+}
+
+
+.ptt-video-pin-button:hover {
+  border-color:
+    #59dcff;
+
+  background:
+    rgba(30, 150, 215, 0.34);
+}
+
+
+.ptt-video-pin-active {
+  opacity:
+    1 !important;
+
+  border-color:
+    #59dcff !important;
+
+  background:
+    rgba(30, 165, 225, 0.30) !important;
+
+  box-shadow:
+    0 0 10px
+    rgba(70, 215, 255, 0.42);
+}
+
+
+/* fullscreen */
+
+.ptt-video-tile:fullscreen
+.ptt-video-pin-button {
+  top:
+    18px;
+
+  right:
+    68px;
+
+  width:
+    42px;
+
+  height:
+    42px;
+
+  opacity:
+    1;
+}
+
+'''
+
+
+if (
+    "PTT CONNECT - VIDEO GALERIJ BEDIENING"
+    not in css
+):
+    css += video_controls_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- videogalerij inklappen/openen toegevoegd"
+)
+
+print(
+    "- gebruiker vastpinnen toegevoegd"
+)
+
+print(
+    "- vastgepinde gebruiker staat vooraan"
+)
+
+print(
+    "- fullscreen blijft werken"
+)
+
+print(
+    "- actieve PTT spreker blijft zichtbaar"
+)
+
+print(
+    "- webcam en schermdelen niet gewijzigd"
+)
+
+print(
+    "- Push-To-Talk audio NIET gewijzigd"
+)
 
 print(
     "- webcam en schermdelen NIET gewijzigd"
