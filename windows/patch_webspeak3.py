@@ -12667,6 +12667,2988 @@ APP_FILE.write_text(
     app,
     encoding="utf-8"
 )
+# ============================================================
+# PTT CONNECT - COMPLETE ANDROID APP VIEW
+# Realistische desktopweergave gebaseerd op Android App design
+#
+# BELANGRIJK:
+# - bestaande TeamSpeak audio blijft behouden
+# - bestaande PTT engine blijft behouden
+# - bestaande ontvangstaudio blijft behouden
+# - kanalen zijn echte TeamSpeak kanalen
+# - gebruikers zijn echte TeamSpeak gebruikers
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# EXTRA STATE VOOR ANDROID APP VIEW
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [
+    pttLayoutMode,
+    setPttLayoutMode
+  ] = useState<
+    "normal" |
+    "cb"
+  >(
+    "normal"
+  );
+''',
+    '''  const [
+    pttLayoutMode,
+    setPttLayoutMode
+  ] = useState<
+    "normal" |
+    "cb"
+  >(
+    "normal"
+  );
+
+  const [
+    pttAndroidSettingsOpen,
+    setPttAndroidSettingsOpen
+  ] = useState(
+    false
+  );
+''',
+    "Android App settings state"
+)
+
+
+# ============================================================
+# WERKENDE FUNCTIES
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const publishClientName = (clid: number) =>
+''',
+    '''  const handleAndroidChannelClick = (
+    channelId: number
+  ) => {
+
+    setSelected({
+      type: "channel",
+      id: channelId,
+    });
+
+    /*
+     * Dit gebruikt exact dezelfde bestaande
+     * TeamSpeak kanaalwissel als de normale
+     * PTT Connect interface.
+     */
+    handleSwitchChannel(
+      channelId
+    );
+  };
+
+
+  const handleAndroidPttStart = () => {
+
+    if (
+      !connected ||
+      !micOn ||
+      inputMuted
+    ) {
+      return;
+    }
+
+    /*
+     * Gebruik de reeds bestaande PTT-engine.
+     * We vervangen of wijzigen geen audio-code.
+     */
+    setTransmissionMode(
+      "ptt"
+    );
+
+    micCaptureRef.current
+      ?.setTransmissionMode(
+        "ptt"
+      );
+
+    micCaptureRef.current
+      ?.setPushToTalk(
+        true
+      );
+  };
+
+
+  const handleAndroidPttStop = () => {
+
+    micCaptureRef.current
+      ?.setPushToTalk(
+        false
+      );
+  };
+
+
+  const openAndroidOption = (
+    section:
+      "wiedergabe" |
+      "aufnahme" |
+      "design" |
+      "sounds" |
+      "hotkeys"
+  ) => {
+
+    setPttAndroidSettingsOpen(
+      false
+    );
+
+    setOptionsSection(
+      section
+    );
+
+    setOptionsDialogOpen(
+      true
+    );
+  };
+
+
+  const publishClientName = (clid: number) =>
+''',
+    "Android App functional handlers"
+)
+
+
+# ============================================================
+# BOVENSTE KNOP HERNOEMEN
+# CB TRANSCEIVER -> ANDROID APP
+# ============================================================
+
+app = app.replace(
+    '''title="CB Transceiver weergave"''',
+    '''title="Android App weergave"''',
+    1
+)
+
+app = app.replace(
+    '''aria-label="CB Transceiver weergave"''',
+    '''aria-label="Android App weergave"''',
+    1
+)
+
+app = app.replace(
+    '''📻 CB Transceiver''',
+    '''📱 Android App''',
+    1
+)
+
+
+# ============================================================
+# OUDE CB OVERLAY VOLLEDIG VERVANGEN
+# ============================================================
+
+android_start_marker = '''
+      {pttLayoutMode === "cb" && (
+'''
+
+android_end_marker = '''
+      {(watchedStream || (publishState !== "idle" && publishState !== "stopped")) && (
+'''
+
+
+android_start = app.find(
+    android_start_marker
+)
+
+android_end = app.find(
+    android_end_marker,
+    android_start
+)
+
+
+if (
+    android_start == -1 or
+    android_end == -1
+):
+    raise RuntimeError(
+        "Kon bestaande CB/Android overlay niet vinden"
+    )
+
+
+android_view = r'''
+      {pttLayoutMode === "cb" && (
+        <section className="ptt-android-view">
+
+          {/* =================================================
+              TOPBAR
+              ================================================= */}
+
+          <header className="ptt-android-topbar">
+
+            <div className="ptt-android-brand">
+
+              <div className="ptt-android-logo">
+                ◀|▶
+              </div>
+
+              <strong>
+                PTT Connect
+              </strong>
+
+            </div>
+
+
+            <div className="ptt-android-top-actions">
+
+              <div className="ptt-android-connected">
+                <span className="ptt-android-connected-dot" />
+
+                <span>
+                  {
+                    connected
+                      ? "Connected"
+                      : "Disconnected"
+                  }
+                </span>
+              </div>
+
+
+              <button
+                type="button"
+                className="ptt-android-back"
+                onClick={() => {
+                  handleAndroidPttStop();
+
+                  setPttAndroidSettingsOpen(
+                    false
+                  );
+
+                  setPttLayoutMode(
+                    "normal"
+                  );
+                }}
+                title="Terug naar normale PTT Connect weergave"
+              >
+                ↩ Windows
+              </button>
+
+
+              <div className="ptt-android-settings-wrap">
+
+                <button
+                  type="button"
+                  className={
+                    "ptt-android-settings-button" +
+                    (
+                      pttAndroidSettingsOpen
+                        ? " ptt-android-settings-button-active"
+                        : ""
+                    )
+                  }
+                  onClick={() =>
+                    setPttAndroidSettingsOpen(
+                      (
+                        current
+                      ) =>
+                        !current
+                    )
+                  }
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  ⚙
+                </button>
+
+
+                {pttAndroidSettingsOpen && (
+                  <div className="ptt-android-settings-menu">
+
+                    <div className="ptt-android-settings-title">
+                      <span>
+                        ⚙
+                      </span>
+
+                      <strong>
+                        Settings
+                      </strong>
+                    </div>
+
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAndroidOption(
+                          "aufnahme"
+                        )
+                      }
+                    >
+                      <span>
+                        🔊
+                      </span>
+
+                      <span>
+                        Audio Devices
+                      </span>
+                    </button>
+
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAndroidOption(
+                          "design"
+                        )
+                      }
+                    >
+                      <span>
+                        🎨
+                      </span>
+
+                      <span className="ptt-android-menu-text">
+                        Appearance
+
+                        <small>
+                          Theme, colors, dark/light mode
+                        </small>
+                      </span>
+
+                      <span className="ptt-android-menu-arrow">
+                        ›
+                      </span>
+                    </button>
+
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAndroidOption(
+                          "sounds"
+                        )
+                      }
+                    >
+                      <span>
+                        🔔
+                      </span>
+
+                      <span>
+                        Notifications
+                      </span>
+                    </button>
+
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAndroidOption(
+                          "hotkeys"
+                        )
+                      }
+                    >
+                      <span>
+                        ⌨
+                      </span>
+
+                      <span>
+                        Hotkeys
+                      </span>
+                    </button>
+
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPttAndroidSettingsOpen(
+                          false
+                        );
+
+                        window.alert(
+                          "PTT Connect\\nWindows desktop client\\nTeamSpeak + Push-To-Talk"
+                        );
+                      }}
+                    >
+                      <span>
+                        ⓘ
+                      </span>
+
+                      <span>
+                        About
+                      </span>
+                    </button>
+
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+
+          </header>
+
+
+          {/* =================================================
+              HOOFDINDELING
+              ================================================= */}
+
+          <div className="ptt-android-content">
+
+
+            {/* ===============================================
+                LINKS - KANALEN
+                =============================================== */}
+
+            <aside className="ptt-android-channels">
+
+              <div className="ptt-android-panel-heading">
+                <span>
+                  CHANNELS
+                </span>
+
+                <span className="ptt-android-panel-plus">
+                  +
+                </span>
+              </div>
+
+
+              <div className="ptt-android-channel-list">
+
+                {pttCbChannels.map(
+                  (
+                    channel,
+                    index
+                  ) => {
+
+                    const channelUsers =
+                      clients.filter(
+                        (
+                          client
+                        ) =>
+                          client.channel ===
+                          channel.id
+                      );
+
+
+                    const active =
+                      channel.id ===
+                      pttCurrentChannel?.id;
+
+
+                    return (
+                      <button
+                        key={
+                          channel.id
+                        }
+                        type="button"
+                        className={
+                          "ptt-android-channel" +
+                          (
+                            active
+                              ? " ptt-android-channel-active"
+                              : ""
+                          )
+                        }
+                        onClick={() =>
+                          handleAndroidChannelClick(
+                            channel.id
+                          )
+                        }
+                      >
+
+                        <div className="ptt-android-channel-icon">
+                          {
+                            index % 3 === 0
+                              ? "▣"
+                              :
+                            index % 3 === 1
+                              ? "♟"
+                              : "◉"
+                          }
+                        </div>
+
+
+                        <div className="ptt-android-channel-info">
+
+                          <strong>
+                            {
+                              channel.name
+                            }
+                          </strong>
+
+                          <span>
+                            {
+                              channelUsers.length
+                            } online
+                          </span>
+
+                        </div>
+
+                      </button>
+                    );
+                  }
+                )}
+
+              </div>
+
+            </aside>
+
+
+            {/* ===============================================
+                MIDDEN - PTT
+                =============================================== */}
+
+            <main className="ptt-android-main">
+
+              <div className="ptt-android-channel-header">
+
+                <div className="ptt-android-chat-icon">
+                  ◯
+                </div>
+
+                <div>
+                  <h2>
+                    {
+                      pttCurrentChannel?.name ??
+                      "No channel"
+                    }
+                  </h2>
+
+                  <div className="ptt-android-channel-subtitle">
+
+                    <span>
+                      {
+                        pttCurrentChannelClients.length
+                      } online
+                    </span>
+
+                    <span>
+                      •
+                    </span>
+
+                    <span>
+                      Push to talk with your team
+                    </span>
+
+                  </div>
+                </div>
+
+              </div>
+
+
+              <div className="ptt-android-ptt-zone">
+
+                <button
+                  type="button"
+                  className={
+                    "ptt-android-ptt" +
+                    (
+                      pttCbTxActive
+                        ? " ptt-android-ptt-transmitting"
+                        : ""
+                    )
+                  }
+                  disabled={
+                    !connected ||
+                    !micOn ||
+                    inputMuted
+                  }
+                  onPointerDown={
+                    (
+                      event
+                    ) => {
+
+                      event.preventDefault();
+
+                      try {
+                        event.currentTarget
+                          .setPointerCapture(
+                            event.pointerId
+                          );
+                      } catch {
+                      }
+
+                      handleAndroidPttStart();
+                    }
+                  }
+                  onPointerUp={
+                    (
+                      event
+                    ) => {
+
+                      event.preventDefault();
+
+                      handleAndroidPttStop();
+                    }
+                  }
+                  onPointerCancel={
+                    handleAndroidPttStop
+                  }
+                  onPointerLeave={
+                    (
+                      event
+                    ) => {
+
+                      if (
+                        event.buttons === 0
+                      ) {
+                        handleAndroidPttStop();
+                      }
+                    }
+                  }
+                  onContextMenu={
+                    (
+                      event
+                    ) =>
+                      event.preventDefault()
+                  }
+                  title={
+                    !micOn
+                      ? "Microfoon is niet actief"
+                      :
+                    inputMuted
+                      ? "Microfoon is gedempt"
+                      : "Houd ingedrukt om te praten"
+                  }
+                >
+
+                  <span className="ptt-android-ptt-mic">
+                    🎙
+                  </span>
+
+                  <strong>
+                    {
+                      pttCbTxActive
+                        ? "TX"
+                        : "PTT"
+                    }
+                  </strong>
+
+                </button>
+
+
+                <div
+                  className={
+                    "ptt-android-speaking" +
+                    (
+                      pttCbTalkingNow
+                        ? " ptt-android-speaking-active"
+                        : ""
+                    )
+                  }
+                >
+
+                  <span className="ptt-android-wave-small">
+                    ≋
+                  </span>
+
+                  <span>
+                    Speaking now:
+                  </span>
+
+                  <strong>
+                    {
+                      pttCbTalkingNow?.name ??
+                      "Nobody"
+                    }
+                  </strong>
+
+                </div>
+
+
+                <div
+                  className={
+                    "ptt-android-wave" +
+                    (
+                      pttCbTalkingNow
+                        ? " ptt-android-wave-active"
+                        : ""
+                    )
+                  }
+                >
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+
+              </div>
+
+            </main>
+
+
+            {/* ===============================================
+                RECHTS - USERS
+                =============================================== */}
+
+            <aside className="ptt-android-users">
+
+              <div className="ptt-android-users-heading">
+                USERS ({
+                  pttCurrentChannelClients.length
+                })
+              </div>
+
+
+              <div className="ptt-android-users-list">
+
+                {pttCurrentChannelClients.map(
+                  (
+                    client,
+                    index
+                  ) => {
+
+                    const talking =
+                      talkers.has(
+                        client.id
+                      ) ||
+                      (
+                        client.id ===
+                          ownClientId &&
+                        pttCbTxActive
+                      );
+
+
+                    const initials =
+                      (
+                        client.name
+                          ?.trim()
+                          .charAt(0) ||
+                        "?"
+                      )
+                        .toUpperCase();
+
+
+                    return (
+                      <div
+                        key={
+                          client.id
+                        }
+                        className={
+                          "ptt-android-user" +
+                          (
+                            talking
+                              ? " ptt-android-user-talking"
+                              : ""
+                          )
+                        }
+                      >
+
+                        <div
+                          className={
+                            "ptt-android-avatar " +
+                            `ptt-android-avatar-${
+                              index % 6
+                            }`
+                          }
+                        >
+                          {
+                            initials
+                          }
+                        </div>
+
+
+                        <span
+                          className={
+                            "ptt-android-user-dot" +
+                            (
+                              talking
+                                ? " ptt-android-user-dot-talking"
+                                :
+                              client.away
+                                ? " ptt-android-user-dot-away"
+                                :
+                              client.inputMuted
+                                ? " ptt-android-user-dot-muted"
+                                : ""
+                            )
+                          }
+                        />
+
+
+                        <div className="ptt-android-user-name">
+
+                          <strong>
+                            {
+                              client.name
+                            }
+                          </strong>
+
+                          {talking && (
+                            <small>
+                              Speaking now
+                            </small>
+                          )}
+
+                        </div>
+
+                      </div>
+                    );
+                  }
+                )}
+
+              </div>
+
+            </aside>
+
+          </div>
+
+
+          {/* =================================================
+              ONDERBALK - ECHTE AUDIO APPARATEN
+              ================================================= */}
+
+          <footer className="ptt-android-audio-bar">
+
+            <div className="ptt-android-device">
+
+              <div className="ptt-android-device-icon">
+                🎙
+              </div>
+
+
+              <label>
+
+                <span>
+                  Microphone
+                </span>
+
+                <select
+                  value={
+                    inputDeviceId
+                  }
+                  onFocus={
+                    refreshInputDevices
+                  }
+                  onChange={
+                    (
+                      event
+                    ) =>
+                      handleInputDeviceChange(
+                        event.target.value
+                      )
+                  }
+                >
+
+                  <option value="">
+                    System Default
+                  </option>
+
+                  {inputDevices.map(
+                    (
+                      device
+                    ) => (
+                      <option
+                        key={
+                          device.deviceId
+                        }
+                        value={
+                          device.deviceId
+                        }
+                      >
+                        {
+                          device.label ||
+                          `Microphone ${
+                            device.deviceId.slice(
+                              0,
+                              6
+                            )
+                          }`
+                        }
+                      </option>
+                    )
+                  )}
+
+                </select>
+
+              </label>
+
+            </div>
+
+
+            <div className="ptt-android-audio-divider" />
+
+
+            <div className="ptt-android-device">
+
+              <div className="ptt-android-device-icon">
+                🔊
+              </div>
+
+
+              <label>
+
+                <span>
+                  Speaker
+                </span>
+
+                <select
+                  value={
+                    outputDeviceId
+                  }
+                  onFocus={
+                    refreshOutputDevices
+                  }
+                  onChange={
+                    (
+                      event
+                    ) =>
+                      void handleOutputDeviceChange(
+                        event.target.value
+                      )
+                  }
+                >
+
+                  <option value="">
+                    System Default
+                  </option>
+
+                  {outputDevices.map(
+                    (
+                      device
+                    ) => (
+                      <option
+                        key={
+                          device.deviceId
+                        }
+                        value={
+                          device.deviceId
+                        }
+                      >
+                        {
+                          device.label ||
+                          `Speaker ${
+                            device.deviceId.slice(
+                              0,
+                              6
+                            )
+                          }`
+                        }
+                      </option>
+                    )
+                  )}
+
+                </select>
+
+              </label>
+
+            </div>
+
+          </footer>
+
+        </section>
+      )}
+
+
+'''
+
+
+app = (
+    app[:android_start] +
+    android_view +
+    app[android_end:]
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS
+# Oude CB CSS mag blijven bestaan.
+# Deze nieuwe CSS gebruikt eigen classes en overschrijft niets
+# van de normale PTT Connect interface.
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+android_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - REALISTIC ANDROID APP VIEW
+   ========================================================== */
+
+.ptt-android-view,
+.ptt-android-view * {
+  box-sizing:
+    border-box;
+}
+
+
+.ptt-android-view {
+  position:
+    fixed;
+
+  z-index:
+    500;
+
+  inset:
+    68px 20px 20px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  min-width:
+    0;
+
+  min-height:
+    0;
+
+  overflow:
+    hidden;
+
+  color:
+    #f4f7ff;
+
+  border:
+    1px solid
+    rgba(
+      120,
+      150,
+      200,
+      0.16
+    );
+
+  border-radius:
+    20px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #101725 0%,
+      #0c1320 100%
+    );
+
+  box-shadow:
+    0 30px 80px
+    rgba(
+      0,
+      0,
+      0,
+      0.52
+    );
+}
+
+
+/* ==========================================================
+   TOPBAR
+   ========================================================== */
+
+.ptt-android-topbar {
+  height:
+    70px;
+
+  flex:
+    0 0 70px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  padding:
+    0 22px;
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.055
+    );
+
+  background:
+    linear-gradient(
+      180deg,
+      #151d2c,
+      #101725
+    );
+}
+
+
+.ptt-android-brand {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    13px;
+}
+
+
+.ptt-android-logo {
+  width:
+    40px;
+
+  height:
+    40px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    50%;
+
+  background:
+    linear-gradient(
+      150deg,
+      #3291ff,
+      #1557ec
+    );
+
+  color:
+    white;
+
+  font-size:
+    11px;
+
+  font-weight:
+    900;
+
+  box-shadow:
+    0 7px 20px
+    rgba(
+      20,
+      90,
+      245,
+      0.35
+    );
+}
+
+
+.ptt-android-brand strong {
+  font-size:
+    22px;
+
+  font-weight:
+    800;
+
+  letter-spacing:
+    -0.02em;
+}
+
+
+.ptt-android-top-actions {
+  position:
+    relative;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    14px;
+}
+
+
+.ptt-android-connected {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+
+  color:
+    #e5ebf5;
+
+  font-size:
+    13px;
+}
+
+
+.ptt-android-connected-dot {
+  width:
+    10px;
+
+  height:
+    10px;
+
+  border-radius:
+    50%;
+
+  background:
+    #20de63;
+
+  box-shadow:
+    0 0 10px
+    rgba(
+      32,
+      222,
+      99,
+      0.42
+    );
+}
+
+
+.ptt-android-back,
+.ptt-android-settings-button {
+  height:
+    40px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.07
+    );
+
+  border-radius:
+    11px;
+
+  background:
+    #192231;
+
+  color:
+    #dfe9fa;
+
+  cursor:
+    pointer;
+}
+
+
+.ptt-android-back {
+  padding:
+    0 14px;
+
+  font-weight:
+    700;
+}
+
+
+.ptt-android-back:hover,
+.ptt-android-settings-button:hover,
+.ptt-android-settings-button-active {
+  border-color:
+    rgba(
+      69,
+      135,
+      255,
+      0.48
+    );
+
+  background:
+    #202c40;
+}
+
+
+.ptt-android-settings-wrap {
+  position:
+    relative;
+}
+
+
+.ptt-android-settings-button {
+  width:
+    44px;
+
+  font-size:
+    20px;
+}
+
+
+/* ==========================================================
+   SETTINGS MENU
+   ========================================================== */
+
+.ptt-android-settings-menu {
+  position:
+    absolute;
+
+  z-index:
+    1000;
+
+  top:
+    49px;
+
+  right:
+    0;
+
+  width:
+    290px;
+
+  overflow:
+    hidden;
+
+  padding:
+    8px;
+
+  border:
+    1px solid
+    rgba(
+      130,
+      155,
+      200,
+      0.22
+    );
+
+  border-radius:
+    14px;
+
+  background:
+    rgba(
+      24,
+      34,
+      50,
+      0.99
+    );
+
+  box-shadow:
+    0 20px 50px
+    rgba(
+      0,
+      0,
+      0,
+      0.50
+    );
+}
+
+
+.ptt-android-settings-title {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  padding:
+    11px 12px 14px;
+
+  margin-bottom:
+    6px;
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.075
+    );
+
+  font-size:
+    16px;
+}
+
+
+.ptt-android-settings-menu button {
+  width:
+    100%;
+
+  min-height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    13px;
+
+  padding:
+    9px 12px;
+
+  border:
+    0;
+
+  border-radius:
+    9px;
+
+  background:
+    transparent;
+
+  color:
+    #eef4ff;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+
+  font-size:
+    14px;
+}
+
+
+.ptt-android-settings-menu button:hover {
+  background:
+    rgba(
+      82,
+      126,
+      206,
+      0.16
+    );
+}
+
+
+.ptt-android-menu-text {
+  flex:
+    1;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    2px;
+}
+
+
+.ptt-android-menu-text small {
+  color:
+    #8495b0;
+
+  font-size:
+    10px;
+}
+
+
+.ptt-android-menu-arrow {
+  margin-left:
+    auto;
+
+  color:
+    #a9bad5;
+
+  font-size:
+    22px;
+}
+
+
+/* ==========================================================
+   CONTENT GRID
+   ========================================================== */
+
+.ptt-android-content {
+  min-height:
+    0;
+
+  flex:
+    1;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    285px minmax(420px, 1fr) 270px;
+
+  background:
+    #0d1421;
+}
+
+
+/* ==========================================================
+   CHANNEL PANEL
+   ========================================================== */
+
+.ptt-android-channels {
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  border-right:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.05
+    );
+
+  background:
+    #101827;
+}
+
+
+.ptt-android-panel-heading {
+  height:
+    60px;
+
+  flex:
+    0 0 60px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  padding:
+    0 20px;
+
+  color:
+    #93a5c2;
+
+  font-size:
+    12px;
+
+  font-weight:
+    800;
+
+  letter-spacing:
+    0.07em;
+}
+
+
+.ptt-android-panel-plus {
+  color:
+    #94a8c7;
+
+  font-size:
+    25px;
+
+  font-weight:
+    300;
+}
+
+
+.ptt-android-channel-list {
+  min-height:
+    0;
+
+  flex:
+    1;
+
+  overflow:
+    auto;
+
+  padding:
+    0 9px 14px;
+}
+
+
+.ptt-android-channel {
+  width:
+    100%;
+
+  min-height:
+    70px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    14px;
+
+  margin:
+    3px 0;
+
+  padding:
+    10px 16px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    10px;
+
+  background:
+    transparent;
+
+  color:
+    inherit;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+
+  transition:
+    background
+    0.13s ease,
+    border-color
+    0.13s ease;
+}
+
+
+.ptt-android-channel:hover {
+  background:
+    rgba(
+      63,
+      95,
+      150,
+      0.10
+    );
+}
+
+
+.ptt-android-channel-active {
+  position:
+    relative;
+
+  border-color:
+    rgba(
+      69,
+      122,
+      216,
+      0.18
+    );
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(
+        45,
+        88,
+        160,
+        0.42
+      ),
+      rgba(
+        38,
+        64,
+        108,
+        0.25
+      )
+    );
+}
+
+
+.ptt-android-channel-active::before {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    0;
+
+  bottom:
+    0;
+
+  left:
+    -9px;
+
+  width:
+    3px;
+
+  border-radius:
+    0 4px 4px 0;
+
+  background:
+    #31bdff;
+}
+
+
+.ptt-android-channel-icon {
+  width:
+    31px;
+
+  flex:
+    0 0 31px;
+
+  color:
+    #48c5ff;
+
+  font-size:
+    21px;
+
+  text-align:
+    center;
+}
+
+
+.ptt-android-channel-info {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    4px;
+}
+
+
+.ptt-android-channel-info strong {
+  overflow:
+    hidden;
+
+  color:
+    #eef3fb;
+
+  font-size:
+    14px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.ptt-android-channel-info span {
+  color:
+    #8192ad;
+
+  font-size:
+    11px;
+}
+
+
+/* ==========================================================
+   MAIN
+   ========================================================== */
+
+.ptt-android-main {
+  min-width:
+    0;
+
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  padding:
+    28px 38px 22px;
+
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(
+        20,
+        42,
+        79,
+        0.30
+      ),
+      rgba(
+        13,
+        20,
+        33,
+        0
+      )
+      52%
+    );
+}
+
+
+.ptt-android-channel-header {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    14px;
+}
+
+
+.ptt-android-chat-icon {
+  width:
+    48px;
+
+  height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    50%;
+
+  background:
+    linear-gradient(
+      145deg,
+      #264c8f,
+      #1b345e
+    );
+
+  color:
+    white;
+
+  font-size:
+    22px;
+}
+
+
+.ptt-android-channel-header h2 {
+  margin:
+    0;
+
+  color:
+    #ffffff;
+
+  font-size:
+    25px;
+
+  line-height:
+    1.2;
+}
+
+
+.ptt-android-channel-subtitle {
+  display:
+    flex;
+
+  gap:
+    10px;
+
+  margin-top:
+    5px;
+
+  color:
+    #8fa1bd;
+
+  font-size:
+    12px;
+}
+
+
+/* ==========================================================
+   PTT ZONE
+   ========================================================== */
+
+.ptt-android-ptt-zone {
+  min-height:
+    0;
+
+  flex:
+    1;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+}
+
+
+.ptt-android-ptt {
+  width:
+    min(
+      330px,
+      43vh
+    );
+
+  height:
+    min(
+      330px,
+      43vh
+    );
+
+  min-width:
+    220px;
+
+  min-height:
+    220px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    10px;
+
+  border:
+    9px solid
+    #2894ff;
+
+  border-radius:
+    50%;
+
+  outline:
+    7px solid
+    rgba(
+      28,
+      95,
+      212,
+      0.30
+    );
+
+  background:
+    radial-gradient(
+      circle at 50% 28%,
+      #39a8ff 0%,
+      #1375f8 31%,
+      #0954e8 66%,
+      #0737a8 100%
+    );
+
+  color:
+    white;
+
+  cursor:
+    pointer;
+
+  user-select:
+    none;
+
+  touch-action:
+    none;
+
+  box-shadow:
+    0 0 0 1px
+    rgba(
+      120,
+      190,
+      255,
+      0.32
+    ),
+    0 0 35px
+    rgba(
+      18,
+      104,
+      255,
+      0.44
+    ),
+    inset 0 16px 34px
+    rgba(
+      255,
+      255,
+      255,
+      0.15
+    ),
+    inset 0 -20px 35px
+    rgba(
+      0,
+      25,
+      90,
+      0.32
+    );
+
+  transition:
+    transform
+    0.08s ease,
+    box-shadow
+    0.08s ease,
+    border-color
+    0.08s ease;
+}
+
+
+.ptt-android-ptt:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 1px
+    rgba(
+      120,
+      200,
+      255,
+      0.40
+    ),
+    0 0 48px
+    rgba(
+      20,
+      120,
+      255,
+      0.58
+    ),
+    inset 0 16px 34px
+    rgba(
+      255,
+      255,
+      255,
+      0.18
+    ),
+    inset 0 -20px 35px
+    rgba(
+      0,
+      25,
+      90,
+      0.32
+    );
+}
+
+
+.ptt-android-ptt:active:not(:disabled),
+.ptt-android-ptt-transmitting {
+  transform:
+    scale(
+      0.965
+    );
+
+  border-color:
+    #6fe8ff;
+
+  background:
+    radial-gradient(
+      circle at 50% 28%,
+      #42d8ff,
+      #087cff 39%,
+      #0754df 72%,
+      #072d82
+    );
+
+  box-shadow:
+    0 0 18px
+    rgba(
+      80,
+      225,
+      255,
+      0.90
+    ),
+    0 0 58px
+    rgba(
+      30,
+      135,
+      255,
+      0.78
+    ),
+    inset 0 15px 30px
+    rgba(
+      255,
+      255,
+      255,
+      0.18
+    );
+}
+
+
+.ptt-android-ptt:disabled {
+  cursor:
+    not-allowed;
+
+  filter:
+    saturate(
+      0.30
+    );
+
+  opacity:
+    0.60;
+}
+
+
+.ptt-android-ptt-mic {
+  font-size:
+    56px;
+}
+
+
+.ptt-android-ptt strong {
+  font-size:
+    37px;
+
+  font-weight:
+    900;
+
+  letter-spacing:
+    0.02em;
+}
+
+
+/* ==========================================================
+   SPEAKING NOW
+   ========================================================== */
+
+.ptt-android-speaking {
+  min-width:
+    340px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    8px;
+
+  margin-top:
+    27px;
+
+  padding:
+    11px 22px;
+
+  border:
+    1px solid
+    rgba(
+      83,
+      115,
+      160,
+      0.35
+    );
+
+  border-radius:
+    999px;
+
+  color:
+    #9eacc1;
+
+  background:
+    rgba(
+      13,
+      21,
+      34,
+      0.76
+    );
+}
+
+
+.ptt-android-speaking-active {
+  border-color:
+    #21dc70;
+
+  color:
+    #e7fff1;
+
+  box-shadow:
+    0 0 12px
+    rgba(
+      31,
+      220,
+      112,
+      0.12
+    );
+}
+
+
+.ptt-android-wave-small {
+  color:
+    #23df7a;
+
+  font-size:
+    22px;
+
+  font-weight:
+    900;
+}
+
+
+.ptt-android-speaking strong {
+  color:
+    #ffffff;
+}
+
+
+/* ==========================================================
+   WAVEFORM
+   ========================================================== */
+
+.ptt-android-wave {
+  height:
+    55px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    5px;
+
+  margin-top:
+    11px;
+}
+
+
+.ptt-android-wave i {
+  width:
+    5px;
+
+  height:
+    12px;
+
+  display:
+    block;
+
+  border-radius:
+    6px;
+
+  background:
+    #263752;
+
+  transition:
+    height
+    0.10s ease,
+    background
+    0.10s ease;
+}
+
+
+.ptt-android-wave-active i {
+  background:
+    #24dc76;
+
+  animation:
+    pttAndroidWave
+    0.72s ease-in-out
+    infinite alternate;
+}
+
+
+.ptt-android-wave-active i:nth-child(2n) {
+  animation-delay:
+    -0.22s;
+}
+
+
+.ptt-android-wave-active i:nth-child(3n) {
+  animation-delay:
+    -0.41s;
+}
+
+
+.ptt-android-wave-active i:nth-child(4n) {
+  animation-delay:
+    -0.58s;
+}
+
+
+@keyframes pttAndroidWave {
+
+  from {
+    height:
+      9px;
+  }
+
+  to {
+    height:
+      47px;
+  }
+
+}
+
+
+/* ==========================================================
+   USERS PANEL
+   ========================================================== */
+
+.ptt-android-users {
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  padding:
+    18px 14px;
+
+  border-left:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.05
+    );
+
+  background:
+    #101827;
+}
+
+
+.ptt-android-users-heading {
+  height:
+    40px;
+
+  flex:
+    0 0 40px;
+
+  padding:
+    7px 8px;
+
+  color:
+    #9aabc5;
+
+  font-size:
+    12px;
+
+  font-weight:
+    800;
+}
+
+
+.ptt-android-users-list {
+  min-height:
+    0;
+
+  overflow:
+    auto;
+}
+
+
+.ptt-android-user {
+  min-height:
+    52px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  padding:
+    6px 9px;
+
+  margin-bottom:
+    3px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    10px;
+
+  transition:
+    background
+    0.12s ease,
+    border-color
+    0.12s ease;
+}
+
+
+.ptt-android-user-talking {
+  border-color:
+    rgba(
+      40,
+      220,
+      115,
+      0.25
+    );
+
+  background:
+    rgba(
+      30,
+      130,
+      75,
+      0.13
+    );
+}
+
+
+.ptt-android-avatar {
+  width:
+    36px;
+
+  height:
+    36px;
+
+  flex:
+    0 0 36px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    50%;
+
+  color:
+    white;
+
+  font-size:
+    14px;
+
+  font-weight:
+    800;
+
+  background:
+    #356cbc;
+}
+
+
+.ptt-android-avatar-1 {
+  background:
+    #6552bc;
+}
+
+
+.ptt-android-avatar-2 {
+  background:
+    #4e8d54;
+}
+
+
+.ptt-android-avatar-3 {
+  background:
+    #a76438;
+}
+
+
+.ptt-android-avatar-4 {
+  background:
+    #3b6fae;
+}
+
+
+.ptt-android-avatar-5 {
+  background:
+    #9b7d29;
+}
+
+
+.ptt-android-user-dot {
+  width:
+    9px;
+
+  height:
+    9px;
+
+  flex:
+    0 0 9px;
+
+  border-radius:
+    50%;
+
+  background:
+    #20df69;
+
+  box-shadow:
+    0 0 5px
+    rgba(
+      32,
+      223,
+      105,
+      0.36
+    );
+}
+
+
+.ptt-android-user-dot-talking {
+  background:
+    #40e9ff;
+
+  box-shadow:
+    0 0 9px
+    #40e9ff;
+}
+
+
+.ptt-android-user-dot-away {
+  background:
+    #ffd227;
+}
+
+
+.ptt-android-user-dot-muted {
+  background:
+    #637086;
+
+  box-shadow:
+    none;
+}
+
+
+.ptt-android-user-name {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+}
+
+
+.ptt-android-user-name strong {
+  overflow:
+    hidden;
+
+  color:
+    #e9eff9;
+
+  font-size:
+    13px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.ptt-android-user-name small {
+  margin-top:
+    2px;
+
+  color:
+    #43e8ff;
+
+  font-size:
+    9px;
+
+  font-weight:
+    700;
+}
+
+
+/* ==========================================================
+   AUDIO BAR
+   ========================================================== */
+
+.ptt-android-audio-bar {
+  min-height:
+    86px;
+
+  flex:
+    0 0 86px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    28px;
+
+  padding:
+    10px 40px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.055
+    );
+
+  background:
+    linear-gradient(
+      180deg,
+      #121b2a,
+      #101725
+    );
+}
+
+
+.ptt-android-device {
+  min-width:
+    0;
+
+  flex:
+    1;
+
+  max-width:
+    520px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+}
+
+
+.ptt-android-device-icon {
+  width:
+    45px;
+
+  height:
+    45px;
+
+  flex:
+    0 0 45px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+
+  border-radius:
+    50%;
+
+  background:
+    #1b2638;
+
+  font-size:
+    20px;
+}
+
+
+.ptt-android-device label {
+  min-width:
+    0;
+
+  flex:
+    1;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+}
+
+
+.ptt-android-device label > span {
+  color:
+    #a6b5cc;
+
+  font-size:
+    11px;
+}
+
+
+.ptt-android-device select {
+  width:
+    100%;
+
+  height:
+    39px;
+
+  padding:
+    0 36px 0 12px;
+
+  border:
+    1px solid
+    rgba(
+      115,
+      145,
+      190,
+      0.20
+    );
+
+  border-radius:
+    8px;
+
+  outline:
+    0;
+
+  color:
+    #e8eef8;
+
+  background:
+    #151f2f;
+}
+
+
+.ptt-android-audio-divider {
+  width:
+    1px;
+
+  height:
+    48px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (
+  max-width:
+    1250px
+) {
+
+  .ptt-android-content {
+    grid-template-columns:
+      230px minmax(
+        360px,
+        1fr
+      )
+      220px;
+  }
+
+
+  .ptt-android-main {
+    padding:
+      24px 20px;
+  }
+
+
+  .ptt-android-ptt {
+    width:
+      250px;
+
+    height:
+      250px;
+
+    min-width:
+      250px;
+
+    min-height:
+      250px;
+  }
+
+}
+
+
+@media (
+  max-width:
+    950px
+) {
+
+  .ptt-android-content {
+    grid-template-columns:
+      190px
+      minmax(
+        320px,
+        1fr
+      );
+  }
+
+
+  .ptt-android-users {
+    display:
+      none;
+  }
+
+
+  .ptt-android-speaking {
+    min-width:
+      280px;
+  }
+
+}
+
+
+@media (
+  max-height:
+    760px
+) {
+
+  .ptt-android-ptt {
+    width:
+      220px;
+
+    height:
+      220px;
+
+    min-width:
+      220px;
+
+    min-height:
+      220px;
+  }
+
+
+  .ptt-android-wave {
+    height:
+      35px;
+  }
+
+}
+
+'''
+
+
+if (
+    "PTT CONNECT - REALISTIC ANDROID APP VIEW"
+    not in css
+):
+    css += (
+        android_css
+    )
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- oude CB Transceiver interface vervangen"
+)
+
+print(
+    "- knop heet nu Android App"
+)
+
+print(
+    "- realistische interface zoals voorbeeld toegevoegd"
+)
+
+print(
+    "- echte TeamSpeak kanalen links"
+)
+
+print(
+    "- kanaal aanklikken wisselt echt van TeamSpeak kanaal"
+)
+
+print(
+    "- echte gebruikers van huidig kanaal rechts"
+)
+
+print(
+    "- actieve spreker wordt live weergegeven"
+)
+
+print(
+    "- grote PTT knop gebruikt bestaande Push-To-Talk engine"
+)
+
+print(
+    "- PTT werkt met muis/touch zolang knop ingedrukt is"
+)
+
+print(
+    "- echte microfoon selector toegevoegd"
+)
+
+print(
+    "- echte luidspreker selector toegevoegd"
+)
+
+print(
+    "- Settings -> Audio Devices werkt"
+)
+
+print(
+    "- Settings -> Appearance werkt"
+)
+
+print(
+    "- Settings -> Notifications werkt"
+)
+
+print(
+    "- Settings -> Hotkeys werkt"
+)
+
+print(
+    "- Windows knop keert terug naar normale weergave"
+)
+
+print(
+    "- stabiele TeamSpeak ontvangstaudio NIET gewijzigd"
+)
+
+print(
+    "- microfoon/audio pipeline NIET vervangen"
+)
+
+print(
+    "- webcam, videogalerij, schermdelen en radio NIET gewijzigd"
+)
 
 print(
     "- CB talkers buildfout opgelost"
