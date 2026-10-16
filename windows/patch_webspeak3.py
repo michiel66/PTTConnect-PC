@@ -15648,8 +15648,54 @@ print(
 
 print(
     "- webcam, videogalerij, schermdelen en radio NIET gewijzigd"
-)
+
 
 print(
     "- CB talkers buildfout opgelost"
 )
+# ============================================================
+# FIX ANDROID APP BUILD - OUDE CB VARIABELEN
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+app = replace_once(
+    app,
+    '''  const handleAndroidChannelClick = (
+''',
+    '''  /*
+   * Deze vier helpers horen nog bij de oude CB-laag.
+   * De nieuwe Android App View gebruikt ze niet direct meer.
+   * We markeren ze bewust als gebruikt zodat TypeScript
+   * de build niet stopt met noUnusedLocals.
+   */
+  void pttCbCurrentNumber;
+  void pttCbRxActive;
+  void pttCbPrevChannel;
+  void pttCbNextChannel;
+
+
+  const handleAndroidChannelClick = (
+''',
+    "mark legacy CB helpers as used"
+)
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+print(
+    "- Android App buildfout opgelost"
+)
+
+print(
+    "- oude CB helpers correct gemarkeerd"
+)
+
+print(
+    "- audio en PTT niet gewijzigd"
+)
+
