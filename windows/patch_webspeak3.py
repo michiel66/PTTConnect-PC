@@ -12589,6 +12589,29 @@ print(
     "- webcam / schermdelen / radiostreams niet gewijzigd"
 )
 
+# ============================================================
+# FIX CB TRANSCEIVER BUILD - PING PROPERTY
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+app = replace_once(
+    app,
+    '''<span>📡 Ping: {serverConnectionInfo?.ping ?? "18"} ms</span>''',
+    '''<span>📡 Ping: {serverConnectionInfo?.pingMs ?? "--"} ms</span>''',
+    "fix CB ping property"
+)
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+print(
+    "- CB ping buildfout opgelost"
+)
 print(
     "- webcam en schermdelen NIET gewijzigd"
 )
