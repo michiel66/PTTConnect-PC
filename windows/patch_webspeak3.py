@@ -7197,3 +7197,1521 @@ print(
 print(
     "- PTT audio streams en microfoon niet gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - MIROTALK ACHTIGE VIDEO GALERIJ
+# Alleen video - audio blijft via TeamSpeak / Push-To-Talk
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# STREAM EVENT NAAR ALLE VIDEO TEGELS STUREN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          streamViewerRef.current?.handleEvent(streamEvent);
+          publisherRef.current?.handleEvent(streamEvent);
+          break;
+''',
+    '''          streamViewerRef.current?.handleEvent(streamEvent);
+          publisherRef.current?.handleEvent(streamEvent);
+
+          /*
+           * PTT Connect videogalerij.
+           *
+           * Iedere videotegeI heeft zijn eigen
+           * StreamViewer/WebRTC verbinding.
+           *
+           * Alle stream-events worden daarom ook
+           * naar de galerij doorgestuurd.
+           */
+          window.dispatchEvent(
+            new CustomEvent<StreamEvent>(
+              "pttconnect-stream-event",
+              {
+                detail:
+                  streamEvent
+              }
+            )
+          );
+
+          break;
+''',
+    "video gallery stream events"
+)
+
+
+# ============================================================
+# VIDEO TILE COMPONENT
+# ============================================================
+
+app = replace_once(
+    app,
+    '''function AlphaBadge() {
+''',
+    '''function PttVideoGalleryTile({
+  info,
+  clientName,
+  send,
+  iceServers,
+}: {
+  info: StreamInfo;
+  clientName: string;
+  send: (
+    message:
+      Record<string, unknown>
+  ) => void;
+  iceServers:
+    RTCIceServer[];
+}) {
+
+  const videoRef =
+    useRef<HTMLVideoElement | null>(
+      null
+    );
+
+  const sendRef =
+    useRef(send);
+
+  const [
+    media,
+    setMedia
+  ] =
+    useState<MediaStream | null>(
+      null
+    );
+
+  const [
+    connectionState,
+    setConnectionState
+  ] =
+    useState<
+      RTCPeerConnectionState |
+      "waiting"
+    >(
+      "waiting"
+    );
+
+  const [
+    error,
+    setError
+  ] =
+    useState<string | null>(
+      null
+    );
+
+
+  /*
+   * Houd de nieuwste send-functie vast
+   * zonder de WebRTC verbinding bij iedere
+   * render opnieuw op te bouwen.
+   */
+  useEffect(
+    () => {
+      sendRef.current =
+        send;
+    },
+    [
+      send
+    ]
+  );
+
+
+  /*
+   * Eén StreamViewer per webcam/schermstream.
+   */
+  useEffect(
+    () => {
+
+      let mounted =
+        true;
+
+      setMedia(
+        null
+      );
+
+      setError(
+        null
+      );
+
+      setConnectionState(
+        "waiting"
+      );
+
+
+      const viewer =
+        new StreamViewer(
+          info.id,
+          info.clientId,
+          {
+            send:
+              (
+                message
+              ) => {
+                sendRef.current(
+                  message
+                );
+              },
+
+            onTrack:
+              (
+                stream
+              ) => {
+
+                if (
+                  !mounted
+                ) {
+                  return;
+                }
+
+                setMedia(
+                  stream
+                );
+              },
+
+            onStateChange:
+              (
+                state
+              ) => {
+
+                if (
+                  !mounted
+                ) {
+                  return;
+                }
+
+                setConnectionState(
+                  state
+                );
+              },
+
+            onError:
+              (
+                message
+              ) => {
+
+                if (
+                  !mounted
+                ) {
+                  return;
+                }
+
+                setError(
+                  message
+                );
+              },
+
+            iceServers,
+          }
+        );
+
+
+      /*
+       * Stream events van de centrale
+       * TeamSpeak verbinding ontvangen.
+       */
+      const handleStreamEvent =
+        (
+          event:
+            Event
+        ) => {
+
+          const customEvent =
+            event as
+              CustomEvent<StreamEvent>;
+
+          if (
+            customEvent.detail
+          ) {
+            viewer.handleEvent(
+              customEvent.detail
+            );
+          }
+        };
+
+
+      window.addEventListener(
+        "pttconnect-stream-event",
+        handleStreamEvent
+      );
+
+
+      /*
+       * Automatisch aansluiten.
+       *
+       * Bij een PUBLIC stream gaat dit
+       * automatisch.
+       *
+       * Bij PRIVATE wacht hij op toestemming
+       * van de gebruiker die de webcam deelt.
+       */
+      viewer.join(
+        "PTT Connect videogalerij"
+      );
+
+
+      return () => {
+
+        mounted =
+          false;
+
+        window.removeEventListener(
+          "pttconnect-stream-event",
+          handleStreamEvent
+        );
+
+        viewer.close();
+      };
+
+    },
+    [
+      info.id,
+      info.clientId
+    ]
+  );
+
+
+  /*
+   * MediaStream aan video-element koppelen.
+   */
+  useEffect(
+    () => {
+
+      const video =
+        videoRef.current;
+
+      if (
+        !video
+      ) {
+        return;
+      }
+
+      if (
+        video.srcObject !==
+        media
+      ) {
+        video.srcObject =
+          media;
+      }
+
+    },
+    [
+      media
+    ]
+  );
+
+
+  const connected =
+    connectionState ===
+      "connected";
+
+
+  return (
+    <div
+      className={
+        "ptt-video-tile" +
+        (
+          connected
+            ? " ptt-video-tile-connected"
+            : ""
+        )
+      }
+    >
+
+      <div className="ptt-video-tile-video">
+
+        <video
+          ref={
+            videoRef
+          }
+          autoPlay
+          playsInline
+
+          /*
+           * ZEER BELANGRIJK:
+           *
+           * videostream-audio wordt hier
+           * altijd gedempt.
+           *
+           * Alle stem/audio blijft via
+           * TeamSpeak Push-To-Talk lopen.
+           */
+          muted
+        />
+
+        {!media && (
+          <div className="ptt-video-waiting">
+
+            <div className="ptt-video-avatar">
+              📷
+            </div>
+
+            <strong>
+              {clientName}
+            </strong>
+
+            <span>
+              {error
+                ? "Video niet beschikbaar"
+                : "Webcam verbinden…"}
+            </span>
+
+          </div>
+        )}
+
+
+        <div className="ptt-video-name">
+
+          <span className="ptt-video-live-dot" />
+
+          <span>
+            {clientName}
+          </span>
+
+          {connected && (
+            <span className="ptt-video-live-text">
+              LIVE
+            </span>
+          )}
+
+        </div>
+
+      </div>
+
+
+      {error && (
+        <div className="ptt-video-error">
+          {error}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+
+function AlphaBadge() {
+''',
+    "PTT video gallery tile component"
+)
+
+
+# ============================================================
+# VIDEO GALERIJ IN DE APP
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      {(watchedStream || (publishState !== "idle" && publishState !== "stopped")) && (
+''',
+    '''      {(() => {
+
+        /*
+         * Bepaal het TeamSpeak-kanaal
+         * waarin wij zelf zitten.
+         */
+        const ownChannelId =
+          clients.find(
+            (
+              client
+            ) =>
+              client.id ===
+              ownClientId
+          )?.channel;
+
+
+        if (
+          ownChannelId ===
+          undefined
+        ) {
+          return null;
+        }
+
+
+        /*
+         * Alleen streams van gebruikers
+         * in hetzelfde kanaal.
+         *
+         * Eigen stream wordt niet opnieuw
+         * geopend: daarvoor bestaat al
+         * de lokale preview.
+         */
+        const channelStreams =
+          Object.values(
+            streamInfos
+          ).filter(
+            (
+              info
+            ) => {
+
+              if (
+                info.clientId ===
+                ownClientId
+              ) {
+                return false;
+              }
+
+              const client =
+                clients.find(
+                  (
+                    candidate
+                  ) =>
+                    candidate.id ===
+                    info.clientId
+                );
+
+              return (
+                client?.channel ===
+                ownChannelId
+              );
+            }
+          );
+
+
+        if (
+          channelStreams.length ===
+          0
+        ) {
+          return null;
+        }
+
+
+        return (
+          <section className="ptt-video-gallery">
+
+            <div className="ptt-video-gallery-header">
+
+              <div className="ptt-video-gallery-title">
+
+                <span className="ptt-video-gallery-icon">
+                  📹
+                </span>
+
+                <div>
+                  <strong>
+                    PTT Connect Video
+                  </strong>
+
+                  <span>
+                    Webcamgalerij • zelfde kanaal
+                  </span>
+                </div>
+
+              </div>
+
+
+              <div className="ptt-video-gallery-status">
+
+                <span className="ptt-video-gallery-online-dot" />
+
+                {
+                  channelStreams.length
+                }
+
+                {
+                  channelStreams.length ===
+                  1
+                    ? " video"
+                    : " video's"
+                }
+
+              </div>
+
+            </div>
+
+
+            <div
+              className={
+                "ptt-video-grid " +
+                (
+                  channelStreams.length === 1
+                    ? "ptt-video-grid-1"
+                    :
+                  channelStreams.length === 2
+                    ? "ptt-video-grid-2"
+                    :
+                  channelStreams.length <= 4
+                    ? "ptt-video-grid-4"
+                    :
+                  channelStreams.length <= 6
+                    ? "ptt-video-grid-6"
+                    :
+                    "ptt-video-grid-many"
+                )
+              }
+            >
+
+              {
+                channelStreams.map(
+                  (
+                    info
+                  ) => {
+
+                    const client =
+                      clients.find(
+                        (
+                          candidate
+                        ) =>
+                          candidate.id ===
+                          info.clientId
+                      );
+
+
+                    return (
+                      <PttVideoGalleryTile
+                        key={
+                          info.id
+                        }
+
+                        info={
+                          info
+                        }
+
+                        clientName={
+                          client?.name ??
+                          `Gebruiker ${info.clientId}`
+                        }
+
+                        send={
+                          (
+                            message
+                          ) => {
+                            socketRef.current
+                              ?.send(
+                                JSON.stringify(
+                                  message
+                                )
+                              );
+                          }
+                        }
+
+                        iceServers={
+                          [
+                            ...DEFAULT_ICE_SERVERS,
+                            ...turnServers
+                          ]
+                        }
+                      />
+                    );
+                  }
+                )
+              }
+
+            </div>
+
+
+            <div className="ptt-video-gallery-footer">
+
+              <span>
+                🎙️ Audio blijft via Push-To-Talk
+              </span>
+
+              <span>
+                🔒 Alleen gebruikers in dit kanaal
+              </span>
+
+            </div>
+
+          </section>
+        );
+
+      })()}
+
+
+      {(watchedStream || (publishState !== "idle" && publishState !== "stopped")) && (
+''',
+    "PTT Connect MiroTalk video gallery"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS - MIROTALK ACHTIGE VIDEO GALERIJ
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+video_gallery_css = r'''
+
+/* ==========================================================
+   PTT CONNECT VIDEO GALERIJ
+   ========================================================== */
+
+.ptt-video-gallery {
+  position:
+    fixed;
+
+  z-index:
+    115;
+
+  left:
+    470px;
+
+  right:
+    24px;
+
+  bottom:
+    22px;
+
+  max-height:
+    58vh;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  overflow:
+    hidden;
+
+  border:
+    1px solid
+    rgba(
+      70,
+      190,
+      255,
+      0.30
+    );
+
+  border-radius:
+    18px;
+
+  background:
+    rgba(
+      5,
+      15,
+      27,
+      0.96
+    );
+
+  backdrop-filter:
+    blur(18px);
+
+  box-shadow:
+    0 24px 60px
+    rgba(
+      0,
+      0,
+      0,
+      0.46
+    ),
+    0 0 26px
+    rgba(
+      20,
+      170,
+      255,
+      0.08
+    );
+}
+
+
+/* ==========================================================
+   HEADER
+   ========================================================== */
+
+.ptt-video-gallery-header {
+  min-height:
+    62px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    16px;
+
+  padding:
+    10px 16px;
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(
+        10,
+        40,
+        63,
+        0.94
+      ),
+      rgba(
+        5,
+        19,
+        33,
+        0.94
+      )
+    );
+}
+
+
+.ptt-video-gallery-title {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    11px;
+}
+
+
+.ptt-video-gallery-icon {
+  width:
+    38px;
+
+  height:
+    38px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid
+    rgba(
+      65,
+      205,
+      255,
+      0.42
+    );
+
+  border-radius:
+    11px;
+
+  background:
+    rgba(
+      40,
+      175,
+      255,
+      0.12
+    );
+
+  font-size:
+    20px;
+}
+
+
+.ptt-video-gallery-title div {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    2px;
+}
+
+
+.ptt-video-gallery-title strong {
+  color:
+    #f4fbff;
+
+  font-size:
+    14px;
+}
+
+
+.ptt-video-gallery-title div > span {
+  color:
+    #8ca9ba;
+
+  font-size:
+    11px;
+}
+
+
+.ptt-video-gallery-status {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+
+  padding:
+    7px 10px;
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(
+      42,
+      196,
+      255,
+      0.09
+    );
+
+  color:
+    #aeeaff;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+}
+
+
+.ptt-video-gallery-online-dot {
+  width:
+    7px;
+
+  height:
+    7px;
+
+  border-radius:
+    50%;
+
+  background:
+    #58e5ff;
+
+  box-shadow:
+    0 0 8px
+    rgba(
+      88,
+      229,
+      255,
+      0.9
+    );
+}
+
+
+/* ==========================================================
+   VIDEO GRID
+   ========================================================== */
+
+.ptt-video-grid {
+  display:
+    grid;
+
+  gap:
+    9px;
+
+  padding:
+    11px;
+
+  overflow:
+    auto;
+
+  min-height:
+    0;
+}
+
+
+.ptt-video-grid-1 {
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    );
+}
+
+
+.ptt-video-grid-2 {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+}
+
+
+.ptt-video-grid-4 {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+}
+
+
+.ptt-video-grid-6 {
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+}
+
+
+.ptt-video-grid-many {
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+}
+
+
+/* ==========================================================
+   VIDEO TEGEL
+   ========================================================== */
+
+.ptt-video-tile {
+  position:
+    relative;
+
+  overflow:
+    hidden;
+
+  min-width:
+    0;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.11
+    );
+
+  border-radius:
+    13px;
+
+  background:
+    #02080e;
+
+  box-shadow:
+    0 10px 24px
+    rgba(
+      0,
+      0,
+      0,
+      0.28
+    );
+
+  transition:
+    border-color
+    0.16s ease,
+    box-shadow
+    0.16s ease;
+}
+
+
+.ptt-video-tile-connected {
+  border-color:
+    rgba(
+      60,
+      210,
+      255,
+      0.30
+    );
+}
+
+
+.ptt-video-tile-video {
+  position:
+    relative;
+
+  width:
+    100%;
+
+  aspect-ratio:
+    16 / 9;
+
+  overflow:
+    hidden;
+
+  background:
+    radial-gradient(
+      circle at center,
+      #0d2638,
+      #02080e
+    );
+}
+
+
+.ptt-video-tile video {
+  width:
+    100%;
+
+  height:
+    100%;
+
+  display:
+    block;
+
+  object-fit:
+    cover;
+
+  background:
+    #02080e;
+}
+
+
+/* ==========================================================
+   WACHTSCHERM
+   ========================================================== */
+
+.ptt-video-waiting {
+  position:
+    absolute;
+
+  inset:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    5px;
+
+  color:
+    #edfaff;
+
+  text-align:
+    center;
+
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(
+        21,
+        74,
+        108,
+        0.56
+      ),
+      rgba(
+        2,
+        8,
+        14,
+        0.95
+      )
+    );
+}
+
+
+.ptt-video-waiting strong {
+  font-size:
+    13px;
+}
+
+
+.ptt-video-waiting span {
+  color:
+    #8caabd;
+
+  font-size:
+    10px;
+}
+
+
+.ptt-video-avatar {
+  width:
+    48px;
+
+  height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  margin-bottom:
+    4px;
+
+  border:
+    1px solid
+    rgba(
+      66,
+      206,
+      255,
+      0.30
+    );
+
+  border-radius:
+    50%;
+
+  background:
+    rgba(
+      32,
+      171,
+      255,
+      0.11
+    );
+
+  font-size:
+    23px;
+}
+
+
+/* ==========================================================
+   NAAM OVER VIDEO
+   ========================================================== */
+
+.ptt-video-name {
+  position:
+    absolute;
+
+  left:
+    8px;
+
+  right:
+    8px;
+
+  bottom:
+    8px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    6px;
+
+  min-width:
+    0;
+
+  padding:
+    6px 8px;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.10
+    );
+
+  border-radius:
+    8px;
+
+  background:
+    rgba(
+      0,
+      7,
+      12,
+      0.76
+    );
+
+  backdrop-filter:
+    blur(8px);
+
+  color:
+    #f5fbff;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+}
+
+
+.ptt-video-name > span:nth-child(2) {
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+.ptt-video-live-dot {
+  flex:
+    0 0 auto;
+
+  width:
+    7px;
+
+  height:
+    7px;
+
+  border-radius:
+    50%;
+
+  background:
+    #50ddff;
+
+  box-shadow:
+    0 0 7px
+    #50ddff;
+}
+
+
+.ptt-video-live-text {
+  margin-left:
+    auto;
+
+  color:
+    #66e4ff;
+
+  font-size:
+    9px;
+
+  letter-spacing:
+    0.07em;
+}
+
+
+/* ==========================================================
+   FOUTMELDING
+   ========================================================== */
+
+.ptt-video-error {
+  padding:
+    7px 9px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      90,
+      90,
+      0.20
+    );
+
+  background:
+    rgba(
+      90,
+      15,
+      18,
+      0.55
+    );
+
+  color:
+    #ffb9bd;
+
+  font-size:
+    10px;
+}
+
+
+/* ==========================================================
+   FOOTER
+   ========================================================== */
+
+.ptt-video-gallery-footer {
+  min-height:
+    36px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    12px;
+
+  padding:
+    7px 13px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.07
+    );
+
+  color:
+    #82a1b4;
+
+  background:
+    rgba(
+      2,
+      10,
+      17,
+      0.94
+    );
+
+  font-size:
+    10px;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (
+  max-width:
+    1200px
+) {
+
+  .ptt-video-gallery {
+    left:
+      390px;
+  }
+
+  .ptt-video-grid-6,
+  .ptt-video-grid-many {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          0,
+          1fr
+        )
+      );
+  }
+
+}
+
+
+@media (
+  max-width:
+    850px
+) {
+
+  .ptt-video-gallery {
+    left:
+      12px;
+
+    right:
+      12px;
+
+    bottom:
+      12px;
+
+    max-height:
+      70vh;
+  }
+
+
+  .ptt-video-grid,
+  .ptt-video-grid-2,
+  .ptt-video-grid-4,
+  .ptt-video-grid-6,
+  .ptt-video-grid-many {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .ptt-video-gallery-footer {
+    flex-direction:
+      column;
+
+    align-items:
+      flex-start;
+  }
+
+}
+
+'''
+
+
+if (
+  "PTT CONNECT VIDEO GALERIJ"
+  not in css
+):
+    css += (
+        video_gallery_css
+    )
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- MiroTalk-achtige videogalerij toegevoegd"
+)
+
+print(
+    "- meerdere webcams tegelijk mogelijk"
+)
+
+print(
+    "- alleen gebruikers uit hetzelfde TeamSpeak-kanaal"
+)
+
+print(
+    "- elke webcam heeft eigen WebRTC verbinding"
+)
+
+print(
+    "- video-audio altijd gedempt"
+)
+
+print(
+    "- spraak blijft uitsluitend via Push-To-Talk"
+)
+
+print(
+    "- bestaande PTT microfoon NIET gewijzigd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio NIET gewijzigd"
+)
+
+print(
+    "- radiostreamplayer NIET gewijzigd"
+)
