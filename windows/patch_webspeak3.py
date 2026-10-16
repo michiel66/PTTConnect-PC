@@ -12615,3 +12615,59 @@ print(
 print(
     "- webcam en schermdelen NIET gewijzigd"
 )
+# ============================================================
+# FIX CB BUILD - TALKERS VOLGORDE
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+app = replace_once(
+    app,
+    '''  const pttCurrentTalkers =
+    pttCurrentChannelClients.filter(
+      (client) =>
+        displayTalkers.has(
+          client.id
+        )
+    );
+''',
+    '''  const pttCurrentTalkers =
+    pttCurrentChannelClients.filter(
+      (client) =>
+        talkers.has(
+          client.id
+        )
+    );
+''',
+    "fix CB current talkers order"
+)
+
+app = replace_once(
+    app,
+    '''  const pttCbTxActive =
+    pttOwnClient
+      ? displayTalkers.has(
+          pttOwnClient.id
+        )
+      : false;
+''',
+    '''  const pttCbTxActive =
+    pttOwnClient
+      ? talkers.has(
+          pttOwnClient.id
+        )
+      : false;
+''',
+    "fix CB TX talker order"
+)
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+print(
+    "- CB talkers buildfout opgelost"
+)
