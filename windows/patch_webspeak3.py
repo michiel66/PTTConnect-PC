@@ -10627,6 +10627,1967 @@ print(
 print(
     "- Push-To-Talk audio NIET gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - CB TRANSCEIVER VIEW
+# Normale weergave <-> CB transceiver weergave
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# STATE - CB VIEW
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [
+    pttPinnedVideoClientId,
+    setPttPinnedVideoClientId
+  ] = useState<number | null>(
+    null
+  );
+''',
+    '''  const [
+    pttPinnedVideoClientId,
+    setPttPinnedVideoClientId
+  ] = useState<number | null>(
+    null
+  );
+
+  const [
+    pttLayoutMode,
+    setPttLayoutMode
+  ] = useState<
+    "normal" |
+    "cb"
+  >(
+    "normal"
+  );
+''',
+    "CB layout mode state"
+)
+
+
+# ============================================================
+# HULPGEGEVENS VOOR CB VIEW
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const publishClientName = (clid: number) =>
+''',
+    '''  const pttOwnClient =
+    clients.find(
+      (client) =>
+        client.id ===
+        ownClientId
+    ) ?? null;
+
+  const pttCurrentChannel =
+    channels.find(
+      (channel) =>
+        channel.id ===
+        pttOwnClient?.channel
+    ) ?? null;
+
+  const pttCbChannels =
+    channels.filter(
+      (channel) =>
+        !String(
+          channel.name ?? ""
+        )
+          .trim()
+          .startsWith("[cspacer]")
+    );
+
+  const pttCbCurrentIndex =
+    Math.max(
+      0,
+      pttCbChannels.findIndex(
+        (channel) =>
+          channel.id ===
+          pttCurrentChannel?.id
+      )
+    );
+
+  const pttCbCurrentNumber =
+    pttCbCurrentIndex >= 0
+      ? pttCbCurrentIndex + 1
+      : 1;
+
+  const pttCurrentChannelClients =
+    pttCurrentChannel
+      ? clients.filter(
+          (client) =>
+            client.channel ===
+            pttCurrentChannel.id
+        )
+      : [];
+
+  const pttCurrentTalkers =
+    pttCurrentChannelClients.filter(
+      (client) =>
+        displayTalkers.has(
+          client.id
+        )
+    );
+
+  const pttCbTalkingNow =
+    pttCurrentTalkers[0] ??
+    null;
+
+  const pttCbTxActive =
+    pttOwnClient
+      ? displayTalkers.has(
+          pttOwnClient.id
+        )
+      : false;
+
+  const pttCbRxActive =
+    pttCurrentTalkers.some(
+      (client) =>
+        client.id !==
+        pttOwnClient?.id
+    );
+
+  const pttCbPrevChannel = () => {
+    if (
+      pttCbChannels.length === 0
+    ) {
+      return;
+    }
+
+    const nextIndex =
+      pttCbCurrentIndex <= 0
+        ? pttCbChannels.length - 1
+        : pttCbCurrentIndex - 1;
+
+    const nextChannel =
+      pttCbChannels[
+        nextIndex
+      ];
+
+    /*
+     * Veilige eerste versie:
+     * selecteert het kanaal visueel.
+     * Later kunnen we dit desgewenst
+     * direct laten joinen.
+     */
+    setSelected({
+      type: "channel",
+      id: nextChannel.id,
+    });
+  };
+
+  const pttCbNextChannel = () => {
+    if (
+      pttCbChannels.length === 0
+    ) {
+      return;
+    }
+
+    const nextIndex =
+      pttCbCurrentIndex >=
+      pttCbChannels.length - 1
+        ? 0
+        : pttCbCurrentIndex + 1;
+
+    const nextChannel =
+      pttCbChannels[
+        nextIndex
+      ];
+
+    setSelected({
+      type: "channel",
+      id: nextChannel.id,
+    });
+  };
+
+
+  const publishClientName = (clid: number) =>
+''',
+    "CB view computed data"
+)
+
+
+# ============================================================
+# KNOPPEN IN DE BOVENBALK
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          </div>
+
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    '''          </div>
+
+
+          <div className="ptt-cb-top-switch">
+
+            <button
+              type="button"
+              className={
+                "ts-icon-button ptt-cb-top-button" +
+                (
+                  pttLayoutMode === "normal"
+                    ? " ptt-cb-top-button-active"
+                    : ""
+                )
+              }
+              onClick={() =>
+                setPttLayoutMode(
+                  "normal"
+                )
+              }
+              title="Normale weergave"
+              aria-label="Normale weergave"
+            >
+              🎙 Normaal
+            </button>
+
+            <button
+              type="button"
+              className={
+                "ts-icon-button ptt-cb-top-button" +
+                (
+                  pttLayoutMode === "cb"
+                    ? " ptt-cb-top-button-active"
+                    : ""
+                )
+              }
+              onClick={() =>
+                setPttLayoutMode(
+                  "cb"
+                )
+              }
+              title="CB Transceiver weergave"
+              aria-label="CB Transceiver weergave"
+            >
+              📻 CB Transceiver
+            </button>
+
+          </div>
+
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    "top buttons normal/cb view"
+)
+
+
+# ============================================================
+# CB OVERLAY VOOR HET EINDE VAN DE APP
+# ============================================================
+
+app = replace_once(
+    app,
+    '''      {(watchedStream || (publishState !== "idle" && publishState !== "stopped")) && (
+''',
+    '''      {pttLayoutMode === "cb" && (
+        <section className="ptt-cb-overlay">
+
+          <div className="ptt-cb-overlay-header">
+
+            <div className="ptt-cb-overlay-title">
+              <span className="ptt-cb-overlay-icon">
+                📻
+              </span>
+
+              <div>
+                <strong>
+                  CB TRANSCEIVER VIEW
+                </strong>
+
+                <span>
+                  Gebruik TeamSpeak kanalen als CB kanalen
+                </span>
+              </div>
+            </div>
+
+
+            <div className="ptt-cb-overlay-header-right">
+
+              <div className="ptt-cb-overlay-info">
+                <strong>
+                  CB kanalen = TeamSpeak kanalen
+                </strong>
+
+                <span>
+                  Elk CB kanaal in deze modus is een TeamSpeak kanaal.
+                </span>
+              </div>
+
+              <button
+                type="button"
+                className="ptt-cb-back-button"
+                onClick={() =>
+                  setPttLayoutMode(
+                    "normal"
+                  )
+                }
+              >
+                ↩ Normaal
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <div className="ptt-cb-overlay-body">
+
+            <aside className="ptt-cb-left-panel">
+
+              <div className="ptt-cb-left-title">
+                📻 CB KANALEN (TeamSpeak)
+              </div>
+
+              <div className="ptt-cb-channel-list">
+                {pttCbChannels
+                  .slice(0, 40)
+                  .map(
+                    (
+                      channel,
+                      index
+                    ) => {
+                      const channelUsers =
+                        clients.filter(
+                          (client) =>
+                            client.channel ===
+                            channel.id
+                        );
+
+                      const active =
+                        channel.id ===
+                        pttCurrentChannel?.id;
+
+                      return (
+                        <div
+                          key={channel.id}
+                          className={
+                            "ptt-cb-channel-row" +
+                            (
+                              active
+                                ? " ptt-cb-channel-row-active"
+                                : ""
+                            )
+                          }
+                        >
+                          <span className="ptt-cb-channel-number">
+                            CH {index + 1}
+                          </span>
+
+                          <span className="ptt-cb-channel-name">
+                            {channel.name}
+                          </span>
+
+                          <span className="ptt-cb-channel-users">
+                            👥 {channelUsers.length}
+                          </span>
+                        </div>
+                      );
+                    }
+                  )}
+              </div>
+
+            </aside>
+
+
+            <main className="ptt-cb-main-panel">
+
+              <div className="ptt-cb-radio-face">
+
+                <div className="ptt-cb-display-block">
+
+                  <div className="ptt-cb-display">
+                    CH {String(
+                      pttCbCurrentNumber
+                    ).padStart(
+                      2,
+                      "0"
+                    )}
+                  </div>
+
+                  <div className="ptt-cb-display-name">
+                    {pttCurrentChannel?.name ??
+                      "Geen kanaal"}
+                  </div>
+
+                  <div className="ptt-cb-display-sub">
+                    🎙 CB kanalen = TeamSpeak kanalen
+                  </div>
+                </div>
+
+
+                <div className="ptt-cb-channel-buttons">
+
+                  <button
+                    type="button"
+                    className="ptt-cb-channel-button"
+                    onClick={
+                      pttCbPrevChannel
+                    }
+                  >
+                    CH +
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ptt-cb-channel-button"
+                    onClick={
+                      pttCbNextChannel
+                    }
+                  >
+                    CH −
+                  </button>
+
+                </div>
+
+
+                <div className="ptt-cb-ptt-block">
+
+                  <div className="ptt-cb-big-ptt">
+                    <span className="ptt-cb-big-ptt-mic">
+                      🎙
+                    </span>
+
+                    <span className="ptt-cb-big-ptt-text">
+                      PTT
+                    </span>
+                  </div>
+
+                </div>
+
+
+                <div className="ptt-cb-rx-tx-block">
+
+                  <div className="ptt-cb-rx-tx-row">
+                    <span>
+                      RX
+                    </span>
+
+                    <span
+                      className={
+                        "ptt-cb-led" +
+                        (
+                          pttCbRxActive
+                            ? " ptt-cb-led-green"
+                            : ""
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div className="ptt-cb-rx-tx-row">
+                    <span>
+                      TX
+                    </span>
+
+                    <span
+                      className={
+                        "ptt-cb-led" +
+                        (
+                          pttCbTxActive
+                            ? " ptt-cb-led-red"
+                            : ""
+                        )
+                      }
+                    />
+                  </div>
+
+                  <div className="ptt-cb-side-button">
+                    ⭐ Favoriet
+                  </div>
+
+                  <div className="ptt-cb-side-button">
+                    🔎 SCAN
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div className="ptt-cb-status-row">
+
+                <div className="ptt-cb-status-card ptt-cb-smeter-card">
+                  <div className="ptt-cb-status-title">
+                    S-METER / SIGNAAL
+                  </div>
+
+                  <div className="ptt-cb-smeter-bars">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+
+                  <div className="ptt-cb-smeter-scale">
+                    <span>S</span>
+                    <span>1</span>
+                    <span>3</span>
+                    <span>5</span>
+                    <span>7</span>
+                    <span>9</span>
+                    <span>+20</span>
+                    <span>+40</span>
+                  </div>
+                </div>
+
+
+                <div className="ptt-cb-status-card">
+                  <div className="ptt-cb-status-title">
+                    NU PRAAT:
+                  </div>
+
+                  <div className="ptt-cb-speaking-name">
+                    {pttCbTalkingNow?.name ??
+                      "Niemand"}
+                  </div>
+
+                  <div className="ptt-cb-speaking-bars">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+
+
+                <div className="ptt-cb-status-card">
+                  <div className="ptt-cb-status-title">
+                    GEBRUIKERS
+                  </div>
+
+                  <div className="ptt-cb-status-big">
+                    {pttCurrentChannelClients.length}
+                    <span> / ∞</span>
+                  </div>
+                </div>
+
+
+                <div className="ptt-cb-knobs-card">
+
+                  <div className="ptt-cb-knob-group">
+                    <div className="ptt-cb-knob-label">
+                      VOLUME
+                    </div>
+
+                    <div className="ptt-cb-knob" />
+                  </div>
+
+                  <div className="ptt-cb-knob-group">
+                    <div className="ptt-cb-knob-label">
+                      SQUELCH
+                    </div>
+
+                    <div className="ptt-cb-knob" />
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div className="ptt-cb-bottom-strip">
+
+                <div className="ptt-cb-bottom-item">
+                  <span className="ptt-cb-bottom-label">
+                    Huidig kanaal
+                  </span>
+
+                  <strong>
+                    CH {String(
+                      pttCbCurrentNumber
+                    ).padStart(
+                      2,
+                      "0"
+                    )} - {pttCurrentChannel?.name ?? "Onbekend"}
+                  </strong>
+                </div>
+
+                <div className="ptt-cb-bottom-item">
+                  <span className="ptt-cb-bottom-label">
+                    Type
+                  </span>
+
+                  <strong>
+                    Spraakkanaal
+                  </strong>
+                </div>
+
+                <div className="ptt-cb-bottom-item">
+                  <span className="ptt-cb-bottom-label">
+                    Codec
+                  </span>
+
+                  <strong>
+                    {pttCurrentChannel?.codec ?? "OpusVoice"}
+                  </strong>
+                </div>
+
+                <div className="ptt-cb-bottom-item">
+                  <span className="ptt-cb-bottom-label">
+                    Gebruikers in kanaal
+                  </span>
+
+                  <strong>
+                    {pttCurrentChannelClients.length} / ∞
+                  </strong>
+                </div>
+
+              </div>
+
+            </main>
+
+          </div>
+
+
+          <div className="ptt-cb-footer-bar">
+            <span>🟢 Verbonden met PTT Connect</span>
+            <span>🎙 Microfoon actief</span>
+            <span>🔊 Luidspreker actief</span>
+            <span>📡 Ping: {serverConnectionInfo?.ping ?? "18"} ms</span>
+          </div>
+
+        </section>
+      )}
+
+
+      {(watchedStream || (publishState !== "idle" && publishState !== "stopped")) && (
+''',
+    "CB overlay render"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS - CB TRANSCEIVER VIEW
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+cb_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - CB TRANSCEIVER VIEW
+   ========================================================== */
+
+.ptt-cb-top-switch {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+
+  margin-left:
+    12px;
+
+  padding:
+    4px;
+
+  border:
+    1px solid
+    rgba(78, 210, 255, 0.22);
+
+  border-radius:
+    16px;
+
+  background:
+    rgba(5, 18, 31, 0.75);
+}
+
+.ptt-cb-top-button {
+  min-width:
+    148px;
+
+  padding:
+    10px 16px !important;
+
+  border-radius:
+    12px !important;
+
+  font-weight:
+    700;
+}
+
+.ptt-cb-top-button-active {
+  border-color:
+    #42d8ff !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(35, 170, 255, 0.28),
+      rgba(10, 60, 105, 0.24)
+    ) !important;
+
+  box-shadow:
+    0 0 14px rgba(66, 216, 255, 0.20);
+}
+
+
+/* ==========================================================
+   OVERLAY
+   ========================================================== */
+
+.ptt-cb-overlay {
+  position:
+    fixed;
+
+  inset:
+    88px 18px 18px 18px;
+
+  z-index:
+    140;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  overflow:
+    hidden;
+
+  border:
+    1px solid rgba(60, 205, 255, 0.36);
+
+  border-radius:
+    18px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(2, 13, 24, 0.98),
+      rgba(2, 9, 18, 0.99)
+    );
+
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(45, 190, 255, 0.10);
+}
+
+.ptt-cb-overlay-header {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    18px;
+
+  padding:
+    16px 18px;
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(3, 18, 34, 0.96),
+      rgba(3, 9, 20, 0.96)
+    );
+}
+
+.ptt-cb-overlay-title {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    14px;
+}
+
+.ptt-cb-overlay-icon {
+  width:
+    48px;
+
+  height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid rgba(67, 214, 255, 0.42);
+
+  border-radius:
+    14px;
+
+  background:
+    rgba(35, 170, 255, 0.10);
+
+  font-size:
+    26px;
+}
+
+.ptt-cb-overlay-title strong {
+  display:
+    block;
+
+  color:
+    #4fe4ff;
+
+  font-size:
+    22px;
+
+  letter-spacing:
+    0.02em;
+}
+
+.ptt-cb-overlay-title span {
+  color:
+    #d8f5ff;
+
+  font-size:
+    13px;
+}
+
+.ptt-cb-overlay-header-right {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    14px;
+}
+
+.ptt-cb-overlay-info {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    4px;
+
+  padding:
+    12px 16px;
+
+  border:
+    1px solid rgba(65, 208, 255, 0.22);
+
+  border-radius:
+    16px;
+
+  background:
+    rgba(8, 25, 40, 0.70);
+}
+
+.ptt-cb-overlay-info strong {
+  color:
+    #f4fbff;
+
+  font-size:
+    14px;
+}
+
+.ptt-cb-overlay-info span {
+  color:
+    #b8d4e5;
+
+  font-size:
+    12px;
+}
+
+.ptt-cb-back-button {
+  min-width:
+    180px;
+
+  padding:
+    16px 18px;
+
+  border:
+    1px solid rgba(76, 220, 255, 0.52);
+
+  border-radius:
+    16px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(33, 165, 255, 0.22),
+      rgba(12, 72, 118, 0.18)
+    );
+
+  color:
+    #dff8ff;
+
+  font-size:
+    16px;
+
+  font-weight:
+    800;
+
+  cursor:
+    pointer;
+
+  box-shadow:
+    0 0 18px rgba(66, 216, 255, 0.12);
+}
+
+.ptt-cb-back-button:hover {
+  border-color:
+    #60e3ff;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(45, 185, 255, 0.30),
+      rgba(14, 84, 132, 0.22)
+    );
+}
+
+
+/* ==========================================================
+   BODY
+   ========================================================== */
+
+.ptt-cb-overlay-body {
+  min-height:
+    0;
+
+  flex:
+    1;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    370px minmax(0, 1fr);
+
+  gap:
+    18px;
+
+  padding:
+    16px 18px;
+}
+
+.ptt-cb-left-panel {
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  border:
+    1px solid rgba(56, 199, 255, 0.20);
+
+  border-radius:
+    16px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 18, 31, 0.92),
+      rgba(2, 11, 21, 0.95)
+    );
+
+  overflow:
+    hidden;
+}
+
+.ptt-cb-left-title {
+  padding:
+    14px 16px;
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  color:
+    #78eaff;
+
+  font-size:
+    14px;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-channel-list {
+  min-height:
+    0;
+
+  overflow:
+    auto;
+
+  padding:
+    10px;
+}
+
+.ptt-cb-channel-row {
+  display:
+    grid;
+
+  grid-template-columns:
+    64px minmax(0, 1fr) auto;
+
+  gap:
+    10px;
+
+  align-items:
+    center;
+
+  margin-bottom:
+    7px;
+
+  padding:
+    10px 12px;
+
+  border:
+    1px solid transparent;
+
+  border-radius:
+    10px;
+
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.ptt-cb-channel-row-active {
+  border-color:
+    rgba(73, 218, 255, 0.46);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(40, 180, 255, 0.18),
+      rgba(9, 50, 82, 0.18)
+    );
+
+  box-shadow:
+    inset 3px 0 0 #58ddff;
+}
+
+.ptt-cb-channel-number {
+  color:
+    #88ddff;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-channel-name {
+  color:
+    #edf8ff;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+.ptt-cb-channel-users {
+  color:
+    #bdd7e7;
+
+  font-size:
+    12px;
+}
+
+
+/* ==========================================================
+   MAIN PANEL
+   ========================================================== */
+
+.ptt-cb-main-panel {
+  min-width:
+    0;
+
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    16px;
+}
+
+.ptt-cb-radio-face {
+  display:
+    grid;
+
+  grid-template-columns:
+    minmax(0, 1.25fr) 150px 260px 180px;
+
+  gap:
+    18px;
+
+  align-items:
+    stretch;
+
+  padding:
+    20px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  border-radius:
+    24px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(23, 29, 38, 0.96),
+      rgba(10, 14, 22, 0.98)
+    );
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+.ptt-cb-display-block {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  justify-content:
+    center;
+
+  gap:
+    10px;
+
+  padding:
+    26px;
+
+  border:
+    1px solid rgba(57, 198, 255, 0.25);
+
+  border-radius:
+    20px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #02111e,
+      #010910
+    );
+
+  box-shadow:
+    inset 0 0 22px rgba(38, 168, 255, 0.18);
+}
+
+.ptt-cb-display {
+  color:
+    #63e4ff;
+
+  font-size:
+    96px;
+
+  font-weight:
+    900;
+
+  letter-spacing:
+    0.05em;
+
+  line-height:
+    1;
+
+  text-align:
+    center;
+
+  text-shadow:
+    0 0 20px rgba(78, 223, 255, 0.55);
+}
+
+.ptt-cb-display-name {
+  padding:
+    10px 12px;
+
+  border:
+    1px solid rgba(53, 198, 255, 0.35);
+
+  border-radius:
+    10px;
+
+  color:
+    #a7ebff;
+
+  font-size:
+    20px;
+
+  font-weight:
+    800;
+
+  text-align:
+    center;
+}
+
+.ptt-cb-display-sub {
+  color:
+    #c7e7f2;
+
+  font-size:
+    13px;
+
+  text-align:
+    center;
+}
+
+.ptt-cb-channel-buttons {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    16px;
+
+  justify-content:
+    center;
+}
+
+.ptt-cb-channel-button {
+  min-height:
+    108px;
+
+  border:
+    1px solid rgba(80, 220, 255, 0.36);
+
+  border-radius:
+    18px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(22, 96, 160, 0.20),
+      rgba(5, 28, 50, 0.22)
+    );
+
+  color:
+    #ecfbff;
+
+  font-size:
+    20px;
+
+  font-weight:
+    800;
+
+  cursor:
+    pointer;
+
+  box-shadow:
+    inset 0 0 10px rgba(76, 212, 255, 0.08);
+}
+
+.ptt-cb-channel-button:hover {
+  border-color:
+    #65e4ff;
+
+  box-shadow:
+    0 0 16px rgba(87, 224, 255, 0.14);
+}
+
+.ptt-cb-ptt-block {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+}
+
+.ptt-cb-big-ptt {
+  width:
+    250px;
+
+  height:
+    250px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    10px;
+
+  border:
+    6px solid rgba(97, 218, 255, 0.90);
+
+  border-radius:
+    50%;
+
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      #364553,
+      #121a24 62%,
+      #070d13
+    );
+
+  box-shadow:
+    inset 0 0 22px rgba(255, 255, 255, 0.06),
+    0 0 26px rgba(52, 206, 255, 0.22);
+}
+
+.ptt-cb-big-ptt-mic {
+  font-size:
+    48px;
+}
+
+.ptt-cb-big-ptt-text {
+  color:
+    #f5fbff;
+
+  font-size:
+    32px;
+
+  font-weight:
+    900;
+}
+
+.ptt-cb-rx-tx-block {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    14px;
+}
+
+.ptt-cb-rx-tx-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  padding:
+    16px 18px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  border-radius:
+    14px;
+
+  background:
+    rgba(5, 15, 28, 0.92);
+
+  color:
+    #ddf7ff;
+
+  font-size:
+    18px;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-led {
+  width:
+    22px;
+
+  height:
+    22px;
+
+  border-radius:
+    50%;
+
+  background:
+    rgba(65, 75, 85, 0.88);
+
+  box-shadow:
+    inset 0 0 3px rgba(0, 0, 0, 0.65);
+}
+
+.ptt-cb-led-green {
+  background:
+    #63ff7c;
+
+  box-shadow:
+    0 0 12px rgba(99, 255, 124, 0.90);
+}
+
+.ptt-cb-led-red {
+  background:
+    #ff5766;
+
+  box-shadow:
+    0 0 12px rgba(255, 87, 102, 0.90);
+}
+
+.ptt-cb-side-button {
+  padding:
+    18px 16px;
+
+  border:
+    1px solid rgba(79, 220, 255, 0.28);
+
+  border-radius:
+    14px;
+
+  background:
+    rgba(5, 15, 28, 0.92);
+
+  color:
+    #e9fbff;
+
+  font-size:
+    16px;
+
+  font-weight:
+    700;
+
+  text-align:
+    center;
+}
+
+
+/* ==========================================================
+   STATUS RIJ
+   ========================================================== */
+
+.ptt-cb-status-row {
+  display:
+    grid;
+
+  grid-template-columns:
+    1.3fr 1fr 0.55fr 0.9fr;
+
+  gap:
+    16px;
+}
+
+.ptt-cb-status-card,
+.ptt-cb-knobs-card {
+  min-height:
+    150px;
+
+  padding:
+    18px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  border-radius:
+    18px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(3, 16, 29, 0.95),
+      rgba(1, 9, 18, 0.98)
+    );
+}
+
+.ptt-cb-status-title {
+  margin-bottom:
+    12px;
+
+  color:
+    #88e9ff;
+
+  font-size:
+    14px;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-smeter-bars,
+.ptt-cb-speaking-bars {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(12, 1fr);
+
+  gap:
+    6px;
+
+  align-items:
+    end;
+
+  min-height:
+    52px;
+
+  margin:
+    10px 0 8px;
+}
+
+.ptt-cb-smeter-bars span,
+.ptt-cb-speaking-bars span {
+  display:
+    block;
+
+  border-radius:
+    3px 3px 0 0;
+}
+
+.ptt-cb-smeter-bars span:nth-child(1)  { height: 20px; background: #49ff8a; }
+.ptt-cb-smeter-bars span:nth-child(2)  { height: 25px; background: #50ff83; }
+.ptt-cb-smeter-bars span:nth-child(3)  { height: 29px; background: #58ff7c; }
+.ptt-cb-smeter-bars span:nth-child(4)  { height: 33px; background: #66ff75; }
+.ptt-cb-smeter-bars span:nth-child(5)  { height: 38px; background: #77ff69; }
+.ptt-cb-smeter-bars span:nth-child(6)  { height: 42px; background: #8fff5f; }
+.ptt-cb-smeter-bars span:nth-child(7)  { height: 48px; background: #afff59; }
+.ptt-cb-smeter-bars span:nth-child(8)  { height: 53px; background: #d4ff57; }
+.ptt-cb-smeter-bars span:nth-child(9)  { height: 58px; background: #ffeb4e; }
+.ptt-cb-smeter-bars span:nth-child(10) { height: 62px; background: #ffc64a; }
+.ptt-cb-smeter-bars span:nth-child(11) { height: 0px;  background: #0f2742; }
+.ptt-cb-smeter-bars span:nth-child(12) { height: 0px;  background: #0f2742; }
+
+.ptt-cb-speaking-bars span:nth-child(1) { height: 28px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(2) { height: 30px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(3) { height: 31px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(4) { height: 29px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(5) { height: 27px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(6) { height: 24px; background: #4eff82; }
+.ptt-cb-speaking-bars span:nth-child(7) { height: 18px; background: #103149; }
+.ptt-cb-speaking-bars span:nth-child(8) { height: 18px; background: #103149; }
+.ptt-cb-speaking-bars span:nth-child(9) { height: 18px; background: #103149; }
+.ptt-cb-speaking-bars span:nth-child(10){ height: 18px; background: #103149; }
+
+.ptt-cb-smeter-scale {
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  color:
+    #f2fbff;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+}
+
+.ptt-cb-speaking-name {
+  color:
+    #f3fbff;
+
+  font-size:
+    28px;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-status-big {
+  color:
+    #edfaff;
+
+  font-size:
+    44px;
+
+  font-weight:
+    900;
+}
+
+.ptt-cb-status-big span {
+  color:
+    #accfde;
+
+  font-size:
+    26px;
+}
+
+.ptt-cb-knobs-card {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-evenly;
+
+  gap:
+    16px;
+}
+
+.ptt-cb-knob-group {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+}
+
+.ptt-cb-knob-label {
+  color:
+    #e7fbff;
+
+  font-size:
+    15px;
+
+  font-weight:
+    800;
+}
+
+.ptt-cb-knob {
+  width:
+    104px;
+
+  height:
+    104px;
+
+  border:
+    6px solid rgba(76, 218, 255, 0.80);
+
+  border-radius:
+    50%;
+
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      #334656,
+      #141c26 64%,
+      #070d13
+    );
+
+  box-shadow:
+    inset 0 0 14px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(65, 206, 255, 0.10);
+}
+
+
+/* ==========================================================
+   BOTTOM STRIP
+   ========================================================== */
+
+.ptt-cb-bottom-strip {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap:
+    14px;
+
+  padding:
+    16px 18px;
+
+  border:
+    1px solid rgba(72, 212, 255, 0.18);
+
+  border-radius:
+    16px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(4, 16, 28, 0.92),
+      rgba(1, 9, 18, 0.96)
+    );
+}
+
+.ptt-cb-bottom-item {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+
+  padding:
+    4px 8px;
+}
+
+.ptt-cb-bottom-label {
+  color:
+    #a8c8d8;
+
+  font-size:
+    12px;
+}
+
+.ptt-cb-bottom-item strong {
+  color:
+    #effaff;
+
+  font-size:
+    24px;
+
+  font-weight:
+    800;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/* ==========================================================
+   FOOTER
+   ========================================================== */
+
+.ptt-cb-footer-bar {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    14px;
+
+  padding:
+    12px 18px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  background:
+    rgba(1, 8, 15, 0.96);
+
+  color:
+    #d9f7ff;
+
+  font-size:
+    13px;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 1500px) {
+
+  .ptt-cb-radio-face {
+    grid-template-columns:
+      minmax(0, 1fr) 130px 220px 160px;
+  }
+
+  .ptt-cb-display {
+    font-size:
+      78px;
+  }
+
+  .ptt-cb-big-ptt {
+    width:
+      210px;
+
+    height:
+      210px;
+  }
+
+}
+
+@media (max-width: 1260px) {
+
+  .ptt-cb-overlay-body {
+    grid-template-columns:
+      1fr;
+  }
+
+  .ptt-cb-left-panel {
+    max-height:
+      260px;
+  }
+
+  .ptt-cb-status-row {
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+  .ptt-cb-bottom-strip {
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+}
+
+@media (max-width: 980px) {
+
+  .ptt-cb-radio-face {
+    grid-template-columns:
+      1fr;
+  }
+
+  .ptt-cb-channel-buttons {
+    flex-direction:
+      row;
+  }
+
+  .ptt-cb-channel-button {
+    min-height:
+      72px;
+
+    flex:
+      1;
+  }
+
+  .ptt-cb-rx-tx-block {
+    display:
+      grid;
+
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+  .ptt-cb-status-row,
+  .ptt-cb-bottom-strip {
+    grid-template-columns:
+      1fr;
+  }
+
+  .ptt-cb-footer-bar,
+  .ptt-cb-overlay-header {
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+  }
+
+  .ptt-cb-overlay-header-right {
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+  }
+
+}
+
+'''
+
+
+if "PTT CONNECT - CB TRANSCEIVER VIEW" not in css:
+    css += cb_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- CB Transceiver View toegevoegd"
+)
+
+print(
+    "- knop Normaal / CB Transceiver toegevoegd"
+)
+
+print(
+    "- terugknop naar normale weergave toegevoegd"
+)
+
+print(
+    "- TeamSpeak kanalen als CB kanalen getoond"
+)
+
+print(
+    "- huidige spreker en kanaalinformatie zichtbaar"
+)
+
+print(
+    "- PTT audio niet gewijzigd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio niet gewijzigd"
+)
+
+print(
+    "- webcam / schermdelen / radiostreams niet gewijzigd"
+)
 
 print(
     "- webcam en schermdelen NIET gewijzigd"
