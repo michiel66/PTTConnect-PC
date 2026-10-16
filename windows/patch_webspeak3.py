@@ -8715,3 +8715,489 @@ print(
 print(
     "- radiostreamplayer NIET gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - SCHERM DELEN NAAST WEBCAM
+# Audio blijft via TeamSpeak / Push-To-Talk
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# BIJHOUDEN WAT WE DELEN: WEBCAM OF SCHERM
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [streamSettingsOpen, setStreamSettingsOpen] = useState(false);
+''',
+    '''  const [streamSettingsOpen, setStreamSettingsOpen] = useState(false);
+
+  const [
+    pttVideoSource,
+    setPttVideoSource
+  ] = useState<
+    "camera" |
+    "screen" |
+    null
+  >(null);
+''',
+    "PTT video source state"
+)
+
+
+# ============================================================
+# STOPPEN = OOK ACTIEVE BRON WISSEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const handleStopPublishing = () => {
+    publisherRef.current?.stop();
+    publisherRef.current = null;
+    setPublishState("idle");
+    setPublishViewers([]);
+    setPublishPending([]);
+  };
+''',
+    '''  const handleStopPublishing = () => {
+    publisherRef.current?.stop();
+
+    publisherRef.current =
+      null;
+
+    setPublishState(
+      "idle"
+    );
+
+    setPublishViewers(
+      []
+    );
+
+    setPublishPending(
+      []
+    );
+
+    setPttVideoSource(
+      null
+    );
+  };
+''',
+    "reset PTT video source on stop"
+)
+
+
+# ============================================================
+# BESTAANDE SCHERMDELEN-KNOP FUNCTIE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const handleStreamButton = () => {
+    if (publisherRef.current) {
+      handleStopPublishing();
+      return;
+    }
+    setStreamSettingsOpen(true);
+  };
+''',
+    '''  const handleStreamButton = () => {
+
+    if (
+      publisherRef.current
+    ) {
+      handleStopPublishing();
+      return;
+    }
+
+    setPttVideoSource(
+      "screen"
+    );
+
+    setStreamSettingsOpen(
+      true
+    );
+  };
+''',
+    "PTT screen share source"
+)
+
+
+# ============================================================
+# WEBCAM ALS CAMERA MARKEREN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''    handleStartPublishing({
+      name:
+''',
+    '''    setPttVideoSource(
+      "camera"
+    );
+
+    handleStartPublishing({
+      name:
+''',
+    "mark webcam as camera source"
+)
+
+
+# ============================================================
+# BIJ STOPPEN / FOUT BRON OOK WISSEN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''        if (state === "stopped" || state === "idle") {
+          publisherRef.current = null;
+          setPublishViewers([]);
+          setPublishPending([]);
+        }
+''',
+    '''        if (
+          state === "stopped" ||
+          state === "idle"
+        ) {
+          publisherRef.current =
+            null;
+
+          setPublishViewers(
+            []
+          );
+
+          setPublishPending(
+            []
+          );
+
+          setPttVideoSource(
+            null
+          );
+        }
+''',
+    "reset video source after publisher stop"
+)
+
+
+# ============================================================
+# SCHERMDELEN DIALOOG ANNULEREN
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          onCancel={() => setStreamSettingsOpen(false)}
+''',
+    '''          onCancel={() => {
+            setStreamSettingsOpen(
+              false
+            );
+
+            setPttVideoSource(
+              null
+            );
+          }}
+''',
+    "screen share cancel reset"
+)
+
+
+# ============================================================
+# WEBCAM KNOP ALLEEN ACTIEF BIJ WEBCAM
+# ============================================================
+
+app = replace_once(
+    app,
+    '''                  publishState === "live"
+                    ? " ptt-webcam-active"
+                    : ""
+''',
+    '''                  pttVideoSource === "camera" &&
+                  publishState === "live"
+                    ? " ptt-webcam-active"
+                    : ""
+''',
+    "webcam active source"
+)
+
+
+app = replace_once(
+    app,
+    '''              title={
+                publishState === "live"
+                  ? "Webcam / video stoppen"
+                  : "Webcam starten"
+              }
+              aria-label={
+                publishState === "live"
+                  ? "Webcam / video stoppen"
+                  : "Webcam starten"
+              }
+            >
+              {publishState === "live"
+                ? "⏹️"
+                : "📷"}
+''',
+    '''              title={
+                pttVideoSource === "camera" &&
+                publishState === "live"
+                  ? "Webcam stoppen"
+                  : "Webcam starten"
+              }
+              aria-label={
+                pttVideoSource === "camera" &&
+                publishState === "live"
+                  ? "Webcam stoppen"
+                  : "Webcam starten"
+              }
+            >
+              {
+                pttVideoSource === "camera" &&
+                publishState === "live"
+                  ? "⏹️"
+                  : "📷"
+              }
+''',
+    "webcam icon correct active source"
+)
+
+
+# ============================================================
+# SCHERMDELEN-KNOP NAAST WEBCAM
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          </div>
+
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    '''          </div>
+
+
+          <div className="ptt-screen-quick">
+
+            <button
+              type="button"
+              className={
+                "ts-icon-button ptt-screen-button" +
+                (
+                  pttVideoSource === "screen" &&
+                  publishState === "live"
+                    ? " ptt-screen-active"
+                    : ""
+                )
+              }
+              onClick={
+                handleStreamButton
+              }
+              disabled={
+                !connected ||
+                ownClientId === null ||
+                DEMO_MODE
+              }
+              title={
+                pttVideoSource === "screen" &&
+                publishState === "live"
+                  ? "Scherm delen stoppen"
+                  : "Scherm delen"
+              }
+              aria-label={
+                pttVideoSource === "screen" &&
+                publishState === "live"
+                  ? "Scherm delen stoppen"
+                  : "Scherm delen"
+              }
+            >
+              {
+                pttVideoSource === "screen" &&
+                publishState === "live"
+                  ? "⏹️"
+                  : "🖥️"
+              }
+            </button>
+
+          </div>
+
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    "screen share button beside webcam"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS SCHERMDELEN
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+screen_share_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - SCHERM DELEN KNOP
+   ========================================================== */
+
+.ptt-screen-quick {
+  position:
+    relative;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+}
+
+
+.ptt-screen-button {
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+
+.ptt-screen-button:hover:not(:disabled) {
+  border-color:
+    var(--ptt-accent) !important;
+
+  box-shadow:
+    0 0 10px
+    var(--ptt-glow);
+
+  transform:
+    translateY(-1px);
+}
+
+
+/* SCHERMDELEN ACTIEF */
+
+.ptt-screen-active {
+  border-color:
+    #59dcff !important;
+
+  background:
+    rgba(
+      35,
+      175,
+      255,
+      0.20
+    ) !important;
+
+  box-shadow:
+    0 0 8px
+    rgba(
+      70,
+      215,
+      255,
+      0.65
+    ),
+    inset 0 0 8px
+    rgba(
+      70,
+      215,
+      255,
+      0.13
+    ) !important;
+}
+
+
+.ptt-screen-active::after {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    4px;
+
+  right:
+    4px;
+
+  width:
+    7px;
+
+  height:
+    7px;
+
+  border-radius:
+    50%;
+
+  background:
+    #59dcff;
+
+  box-shadow:
+    0 0 8px
+    #59dcff;
+}
+
+'''
+
+
+if (
+    "PTT CONNECT - SCHERM DELEN KNOP"
+    not in css
+):
+    css += (
+        screen_share_css
+    )
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- schermdelen knop toegevoegd"
+)
+
+print(
+    "- volgorde: streamplayer - webcam - schermdelen"
+)
+
+print(
+    "- webcam en schermdelen worden apart herkend"
+)
+
+print(
+    "- schermkeuze gebeurt via Windows"
+)
+
+print(
+    "- gedeeld scherm verschijnt in videogalerij"
+)
+
+print(
+    "- video-audio verandert PTT niet"
+)
+
+print(
+    "- bestaande Push-To-Talk microfoon NIET gewijzigd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio NIET gewijzigd"
+)
+
+print(
+    "- webcamfunctie NIET verwijderd"
+)
