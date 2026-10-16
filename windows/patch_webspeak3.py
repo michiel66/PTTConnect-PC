@@ -6664,6 +6664,535 @@ print(
 print(
     "- PTT audio microfoon streams en icoon niet gewijzigd"
 )
+# ============================================================
+# PTT CONNECT - WEBCAM NAAST STREAMPLAYER
+# ============================================================
+
+PUBLISH_FILE = Path(
+    "upstream/web/src/publish.ts"
+)
+
+
+# ============================================================
+# PUBLISH.TS - CAMERA ALS BRON TOESTAAN
+# ============================================================
+
+publish = PUBLISH_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+publish = replace_once(
+    publish,
+    '''export interface StreamPublishOptions {
+  name: string;
+''',
+    '''export interface StreamPublishOptions {
+  name: string;
+
+  /** PTT Connect: scherm of webcam. */
+  source?: "screen" | "camera";
+''',
+    "webcam stream source option"
+)
+
+
+publish = replace_once(
+    publish,
+    '''  async start(options: StreamPublishOptions): Promise<void> {
+    if (this.state === "live" || this.state === "starting") return;
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      this.fail("Screen sharing requires HTTPS (or localhost) - the site is not a secure context.");
+      return;
+    }
+
+    this.setState("starting");
+    this.options = options;
+
+    const video: MediaTrackConstraints = {};
+    if (options.height > 0) video.height = { ideal: options.height };
+    if (options.fps > 0) video.frameRate = { ideal: options.fps };
+
+    try {
+      this.media = await navigator.mediaDevices.getDisplayMedia({
+        video: Object.keys(video).length > 0 ? video : true,
+        audio: options.audio,
+      });
+    } catch (err) {
+      this.setState("idle");
+      this.fail(`Could not capture the screen: ${describe(err)}`);
+      return;
+    }
+''',
+    '''  async start(options: StreamPublishOptions): Promise<void> {
+    if (
+      this.state === "live" ||
+      this.state === "starting"
+    ) {
+      return;
+    }
+
+    const source =
+      options.source ?? "screen";
+
+    if (
+      !navigator.mediaDevices
+    ) {
+      this.fail(
+        "Media-apparaten zijn niet beschikbaar."
+      );
+
+      return;
+    }
+
+    if (
+      source === "screen" &&
+      !navigator.mediaDevices.getDisplayMedia
+    ) {
+      this.fail(
+        "Scherm delen is niet beschikbaar."
+      );
+
+      return;
+    }
+
+    if (
+      source === "camera" &&
+      !navigator.mediaDevices.getUserMedia
+    ) {
+      this.fail(
+        "Webcam is niet beschikbaar."
+      );
+
+      return;
+    }
+
+    this.setState(
+      "starting"
+    );
+
+    this.options =
+      options;
+
+    const video:
+      MediaTrackConstraints = {};
+
+    if (
+      options.height > 0
+    ) {
+      video.height = {
+        ideal:
+          options.height
+      };
+    }
+
+    if (
+      options.fps > 0
+    ) {
+      video.frameRate = {
+        ideal:
+          options.fps
+      };
+    }
+
+    try {
+
+      if (
+        source === "camera"
+      ) {
+
+        this.media =
+          await navigator.mediaDevices
+            .getUserMedia({
+              video:
+                Object.keys(video).length > 0
+                  ? video
+                  : true,
+
+              /*
+               * Webcam-audio staat bewust uit.
+               * PTT Connect gebruikt de bestaande
+               * TeamSpeak/PTT microfoon voor spraak.
+               */
+              audio:
+                false,
+            });
+
+      } else {
+
+        this.media =
+          await navigator.mediaDevices
+            .getDisplayMedia({
+              video:
+                Object.keys(video).length > 0
+                  ? video
+                  : true,
+
+              audio:
+                options.audio,
+            });
+
+      }
+
+    } catch (err) {
+
+      this.setState(
+        "idle"
+      );
+
+      this.fail(
+        source === "camera"
+          ? `Webcam kon niet worden gestart: ${describe(err)}`
+          : `Scherm kon niet worden gedeeld: ${describe(err)}`
+      );
+
+      return;
+    }
+''',
+    "webcam media capture"
+)
+
+
+publish = replace_once(
+    publish,
+    '''      streamType: this.detectSourceType(),
+''',
+    '''      streamType:
+        options.source === "camera"
+          ? StreamSource.CAMERA
+          : this.detectSourceType(),
+''',
+    "webcam stream type"
+)
+
+
+PUBLISH_FILE.write_text(
+    publish,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# APP.TSX
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# WEBCAM START / STOP FUNCTIE
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const publishClientName = (clid: number) =>
+''',
+    '''  const handleWebcamButton = () => {
+
+    /*
+     * Als er al een webcam of andere
+     * videostream actief is:
+     * stoppen.
+     */
+    if (
+      publisherRef.current
+    ) {
+      handleStopPublishing();
+      return;
+    }
+
+    if (
+      ownClientId === null
+    ) {
+      return;
+    }
+
+    /*
+     * Webcam gebruikt de bestaande
+     * StreamPublisher / WebRTC verbinding.
+     *
+     * Webcam-microfoon staat UIT zodat
+     * de bestaande PTT-audio niet wordt
+     * aangeraakt of dubbel verzonden.
+     */
+    handleStartPublishing({
+      name:
+        `${
+          ownClient?.name ??
+          "PTT Connect"
+        } - Webcam`,
+
+      source:
+        "camera",
+
+      audio:
+        false,
+
+      accessibility:
+        StreamAccess.PUBLIC,
+
+      mode:
+        StreamMode.P2P,
+
+      viewerLimit:
+        0,
+
+      height:
+        720,
+
+      fps:
+        30,
+
+      videoBitrateKbps:
+        2500,
+
+      audioBitrateKbps:
+        128,
+
+      contentHint:
+        "motion",
+    });
+  };
+
+
+  const publishClientName = (clid: number) =>
+''',
+    "PTT Connect webcam handler"
+)
+
+
+# ============================================================
+# WEBCAM KNOP NAAST STREAMPLAYER
+# ============================================================
+
+app = replace_once(
+    app,
+    '''          </div>
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    '''          </div>
+
+
+          <div className="ptt-webcam-quick">
+
+            <button
+              type="button"
+              className={
+                "ts-icon-button ptt-webcam-button" +
+                (
+                  publishState === "live"
+                    ? " ptt-webcam-active"
+                    : ""
+                )
+              }
+              onClick={
+                handleWebcamButton
+              }
+              disabled={
+                !connected ||
+                ownClientId === null ||
+                DEMO_MODE
+              }
+              title={
+                publishState === "live"
+                  ? "Webcam / video stoppen"
+                  : "Webcam starten"
+              }
+              aria-label={
+                publishState === "live"
+                  ? "Webcam / video stoppen"
+                  : "Webcam starten"
+              }
+            >
+              {publishState === "live"
+                ? "⏹️"
+                : "📷"}
+            </button>
+
+          </div>
+
+
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="ts-app-logo" />
+''',
+    "webcam button beside stream player"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS WEBCAM KNOP
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+webcam_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - WEBCAM KNOP
+   ========================================================== */
+
+.ptt-webcam-quick {
+  position:
+    relative;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+}
+
+
+.ptt-webcam-button {
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+
+.ptt-webcam-button:hover:not(:disabled) {
+  border-color:
+    var(--ptt-accent) !important;
+
+  box-shadow:
+    0 0 10px
+    var(--ptt-glow);
+
+  transform:
+    translateY(-1px);
+}
+
+
+/* ==========================================================
+   WEBCAM / VIDEO ACTIEF
+   ========================================================== */
+
+.ptt-webcam-active {
+  border-color:
+    #39dfff !important;
+
+  background:
+    rgba(
+      40,
+      190,
+      255,
+      0.18
+    ) !important;
+
+  box-shadow:
+    0 0 7px
+    rgba(
+      60,
+      215,
+      255,
+      0.60
+    ),
+    inset 0 0 8px
+    rgba(
+      60,
+      215,
+      255,
+      0.12
+    ) !important;
+}
+
+
+/* klein actief lampje */
+
+.ptt-webcam-active::after {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    4px;
+
+  right:
+    4px;
+
+  width:
+    7px;
+
+  height:
+    7px;
+
+  border-radius:
+    50%;
+
+  background:
+    #45e8ff;
+
+  box-shadow:
+    0 0 8px
+    #45e8ff;
+}
+
+'''
+
+
+if "PTT CONNECT - WEBCAM KNOP" not in css:
+    css += webcam_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- webcam knop naast streamplayer toegevoegd"
+)
+
+print(
+    "- webcam gebruikt bestaande WebRTC stream"
+)
+
+print(
+    "- andere gebruikers kunnen webcamstream bekijken"
+)
+
+print(
+    "- webcam staat standaard uit"
+)
+
+print(
+    "- webcam gebruikt 720p 30fps"
+)
+
+print(
+    "- webcam-microfoon staat uit"
+)
+
+print(
+    "- bestaande PTT microfoon niet gewijzigd"
+)
+
+print(
+    "- TeamSpeak ontvangstaudio niet gewijzigd"
+)
+
+print(
+    "- radiostreams niet gewijzigd"
+)
 
 print(
     "- PTT audio streams en microfoon niet gewijzigd"
