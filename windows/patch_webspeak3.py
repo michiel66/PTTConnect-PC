@@ -6051,4 +6051,533 @@ print(
 
 print(
     "- PTT microfoon TeamSpeak audio en streams niet gewijzigd"
+)# ============================================================
+# PTT CONNECT - SLIM AUTOMATISCH CONTRAST
+# ============================================================
+
+app = APP_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# HULPFUNCTIES VOOR LICHT/DONKER KLEUR
+# ============================================================
+
+app = replace_once(
+    app,
+    '''function loadPttCustomColor(): string {
+''',
+    '''function hexToRgb(
+  hex: string
+): {
+  r: number;
+  g: number;
+  b: number;
+} | null {
+  const match =
+    /^#([0-9a-fA-F]{6})$/.exec(
+      hex
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const value =
+    match[1];
+
+  return {
+    r:
+      parseInt(
+        value.slice(0, 2),
+        16
+      ),
+
+    g:
+      parseInt(
+        value.slice(2, 4),
+        16
+      ),
+
+    b:
+      parseInt(
+        value.slice(4, 6),
+        16
+      ),
+  };
+}
+
+function isLightPttColor(
+  hex: string
+): boolean {
+  const rgb =
+    hexToRgb(hex);
+
+  if (!rgb) {
+    return false;
+  }
+
+  const luminance =
+    (
+      0.299 * rgb.r +
+      0.587 * rgb.g +
+      0.114 * rgb.b
+    );
+
+  return luminance >= 170;
+}
+
+function loadPttCustomColor(): string {
+''',
+    "smart contrast helpers"
+)
+
+
+# ============================================================
+# BEREKENEN OF CUSTOM KLEUR LICHT IS
+# ============================================================
+
+app = replace_once(
+    app,
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+''',
+    '''  const [
+    pttThemeMenuOpen,
+    setPttThemeMenuOpen
+  ] = useState(false);
+
+  const pttCustomColorIsLight =
+    isLightPttColor(
+      pttCustomColor
+    );
+''',
+    "custom color brightness"
+)
+
+
+# ============================================================
+# EXTRA CLASS OP DE APP
+# ============================================================
+
+app = replace_once(
+    app,
+    '''}${novaSplash ? " ts-nova-splash" : ""} ts-ptt-color-${pttColorTheme}${
+        pttCustomColorActive
+          ? " ptt-custom-color"
+          : ""
+      }`}
+''',
+    '''}${novaSplash ? " ts-nova-splash" : ""} ts-ptt-color-${pttColorTheme}${
+        pttCustomColorActive
+          ? " ptt-custom-color"
+          : ""
+      }${
+        pttCustomColorActive &&
+        pttCustomColorIsLight
+          ? " ptt-custom-color-light"
+          : ""
+      }`}
+''',
+    "smart custom color contrast class"
+)
+
+
+APP_FILE.write_text(
+    app,
+    encoding="utf-8"
+)
+
+
+# ============================================================
+# CSS SLIM CONTRAST
+# ============================================================
+
+css = CSS_FILE.read_text(
+    encoding="utf-8"
+)
+
+
+smart_contrast_css = r'''
+
+/* ==========================================================
+   PTT CONNECT - SLIM AUTOMATISCH CONTRAST
+   ========================================================== */
+
+
+/* ==========================================================
+   STANDAARD: DONKERE / NORMALE ACCENTKLEUR
+   ========================================================== */
+
+.ts-app.ptt-custom-color {
+  --ptt-text-main:
+    #f4fbff;
+
+  --ptt-text-soft:
+    #b8d1e2;
+
+  --ptt-text-muted:
+    #89a7ba;
+
+  --ptt-accent-text:
+    #ffffff;
+
+  --ptt-selected-text:
+    #ffffff;
+}
+
+
+/* ==========================================================
+   LICHTE CUSTOM KLEUR
+   Bijvoorbeeld geel, lichtgroen, lichtroze
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light {
+  --ptt-text-main:
+    #f4fbff;
+
+  --ptt-text-soft:
+    #c2d7e5;
+
+  --ptt-text-muted:
+    #91aabd;
+
+  --ptt-accent-text:
+    #07131d;
+
+  --ptt-selected-text:
+    #07131d;
+}
+
+
+/* ==========================================================
+   SELECTIES
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ts-row-selected {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(
+        in srgb,
+        var(--ptt-accent) 82%,
+        #ffffff
+      ),
+      color-mix(
+        in srgb,
+        var(--ptt-accent) 46%,
+        #0b1e2c
+      )
+    ) !important;
+
+  outline:
+    1px solid
+    var(--ptt-accent) !important;
+
+  box-shadow:
+    inset 3px 0 0
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 65%,
+      #07131d
+    ) !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ts-row-selected,
+.ts-app.ptt-custom-color-light
+.ts-row-selected * {
+  color:
+    var(--ptt-selected-text)
+    !important;
+
+  text-shadow:
+    none !important;
+}
+
+
+/* ==========================================================
+   THEMA TITELS
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ptt-dashboard-title,
+.ts-app.ptt-custom-color-light
+.ptt-theme-menu-title,
+.ts-app.ptt-custom-color-light
+.ptt-stream-quick-title,
+.ts-app.ptt-custom-color-light
+.ptt-custom-color-title {
+  color:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 62%,
+      #ffffff
+    ) !important;
+
+  text-shadow:
+    0 1px 2px
+    rgba(
+      0,
+      0,
+      0,
+      0.55
+    ) !important;
+}
+
+
+/* ==========================================================
+   KNOPPEN
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ts-icon-button {
+  color:
+    #ffffff !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ts-icon-button:hover {
+  background:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 24%,
+      #0b1e2c
+    ) !important;
+}
+
+
+/* ==========================================================
+   MENU ACTIEF ITEM
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ptt-theme-menu-active {
+  background:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 72%,
+      #ffffff
+    ) !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ptt-theme-menu-active,
+.ts-app.ptt-custom-color-light
+.ptt-theme-menu-active * {
+  color:
+    #07131d !important;
+
+  text-shadow:
+    none !important;
+}
+
+
+/* ==========================================================
+   DASHBOARD KAARTEN
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ptt-dashboard-card {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 44%,
+      #102637
+    ) !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ptt-dashboard-brand {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 48%,
+      #102637
+    ) !important;
+}
+
+
+/* ==========================================================
+   INPUTS
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+input,
+.ts-app.ptt-custom-color-light
+select,
+.ts-app.ptt-custom-color-light
+textarea {
+  color:
+    #ffffff !important;
+
+  background:
+    #0a1b29 !important;
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 46%,
+      #173347
+    ) !important;
+}
+
+
+/* ==========================================================
+   LINKS / INFO
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ts-info-connection-link {
+  color:
+    #eaf7ff !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ts-info-connection-link:hover {
+  color:
+    #ffffff !important;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 18%,
+      #0b1e2c
+    ) !important;
+}
+
+
+/* ==========================================================
+   SPREKER HIGHLIGHT
+   Houdt goede leesbaarheid bij lichte kleuren
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ptt-active-user-talking {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(
+        in srgb,
+        var(--ptt-accent) 28%,
+        #0b1e2c
+      ),
+      #0b1e2c
+    ) !important;
+
+  border-color:
+    var(--ptt-accent)
+    !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ptt-active-user-talking,
+.ts-app.ptt-custom-color-light
+.ptt-active-user-talking * {
+  color:
+    #ffffff !important;
+}
+
+
+.ts-app.ptt-custom-color-light
+.ptt-speaking-now-text {
+  color:
+    color-mix(
+      in srgb,
+      var(--ptt-accent) 50%,
+      #ffffff
+    ) !important;
+}
+
+
+/* ==========================================================
+   SERVER / KANAAL TEKST ALTIJD LEESBAAR
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ts-server-row,
+.ts-app.ptt-custom-color-light
+.ts-server-row *,
+.ts-app.ptt-custom-color-light
+.ts-channel-row,
+.ts-app.ptt-custom-color-light
+.ts-channel-row *,
+.ts-app.ptt-custom-color-light
+.ts-client-row,
+.ts-app.ptt-custom-color-light
+.ts-client-row * {
+  color:
+    #edf7ff !important;
+}
+
+
+/* behalve geselecteerde regel */
+.ts-app.ptt-custom-color-light
+.ts-row-selected,
+.ts-app.ptt-custom-color-light
+.ts-row-selected * {
+  color:
+    #07131d !important;
+}
+
+
+/* ==========================================================
+   ALGEMENE TITELS
+   ========================================================== */
+
+.ts-app.ptt-custom-color-light
+.ts-info-title,
+.ts-app.ptt-custom-color-light
+.ptt-dashboard-channel-name,
+.ts-app.ptt-custom-color-light
+.ptt-active-user-info strong {
+  color:
+    #ffffff !important;
+}
+
+'''
+
+
+if "PTT CONNECT - SLIM AUTOMATISCH CONTRAST" not in css:
+    css += smart_contrast_css
+
+
+CSS_FILE.write_text(
+    css,
+    encoding="utf-8"
+)
+
+
+print(
+    "- slim automatisch contrast toegevoegd"
+)
+
+print(
+    "- lichte eigen kleuren worden automatisch herkend"
+)
+
+print(
+    "- geselecteerde regels blijven leesbaar"
+)
+
+print(
+    "- donkere kleuren houden lichte tekst"
+)
+
+print(
+    "- lichte kleuren krijgen donkere tekst waar nodig"
+)
+
+print(
+    "- PTT audio streams en microfoon niet gewijzigd"
 )
