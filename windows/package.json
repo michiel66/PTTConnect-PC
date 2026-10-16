@@ -2,7 +2,7 @@
   "name": "pttconnect-windows",
   "version": "0.1.0",
   "private": true,
-  "description": "PTT Connect desktop client for Windows",
+  "description": "PTT Connect desktop client voor Windows",
   "main": "main.cjs",
   "scripts": {
     "dist": "electron-builder --win nsis portable --x64"
@@ -15,30 +15,39 @@
     "appId": "nl.pttconnect.windows",
     "productName": "PTT Connect",
     "asar": true,
+
     "files": [
       "main.cjs",
-      "package.json"
+      "package.json",
+      "PTTConnect.ico"
     ],
+
     "extraResources": [
       {
         "from": "runtime",
         "to": "runtime"
       }
     ],
+
     "win": {
+      "icon": "PTTConnect.ico",
       "target": [
         "nsis",
         "portable"
       ],
       "artifactName": "PTTConnect-Windows-${version}-${arch}.${ext}"
     },
+
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "installerIcon": "PTTConnect.ico",
+      "uninstallerIcon": "PTTConnect.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "PTT Connect"
     },
+
     "directories": {
       "output": "dist"
     }
